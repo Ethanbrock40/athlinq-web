@@ -1,5 +1,5 @@
 // pages/my-deals.js
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
@@ -8,8 +8,10 @@ import { auth, db } from '../lib/firebaseConfig';
 export default function MyDealsPage() {
   const [currentUser, setCurrentUser] = useState(null);
   const [currentUserData, setCurrentUserData] = useState(null);
-  const [deals, setDeals] = useState([]);
+  const [allDeals, setAllDeals] = useState([]); // Stores all fetched deals
   const [loading, setLoading] = useState(true);
+  const [selectedStatus, setSelectedStatus] = useState('all'); // New state for filter
+
   const router = useRouter();
 
   useEffect(() => {
@@ -34,9 +36,7 @@ export default function MyDealsPage() {
       // Fetch deals where current user is the athlete OR the proposing business
       const dealsCollectionRef = collection(db, 'deals');
 
-      // Query 1: Deals where current user is the athlete
       const qAthlete = query(dealsCollectionRef, where('athleteId', '==', user.uid));
-      // Query 2: Deals where current user is the proposing business
       const qBusiness = query(dealsCollectionRef, where('proposingBusinessId', '==', user.uid));
 
       const [snapshotAthlete, snapshotBusiness] = await Promise.all([
@@ -44,28 +44,24 @@ export default function MyDealsPage() {
         getDocs(qBusiness)
       ]);
 
-      let allDeals = {}; // Use object to merge and de-duplicate
+      let allUserDeals = {}; // Use object to merge and de-duplicate
       snapshotAthlete.docs.forEach(doc => {
-        allDeals[doc.id] = { id: doc.id, ...doc.data() };
+        allUserDeals[doc.id] = { id: doc.id, ...doc.data() };
       });
       snapshotBusiness.docs.forEach(doc => {
-        allDeals[doc.id] = { id: doc.id, ...doc.data() };
+        allUserDeals[doc.id] = { id: doc.id, ...doc.data() };
       });
 
-      const dealsList = await Promise.all(Object.values(allDeals).map(async (deal) => {
+      const dealsList = await Promise.all(Object.values(allUserDeals).map(async (deal) => {
         let otherPartyName = 'N/A';
-        let otherPartyId = '';
-
-        if (userData.userType === 'athlete' && deal.proposingBusinessId) {
-          otherPartyId = deal.proposingBusinessId;
+        // The names are already stored on the deal document during proposal, no need to re-fetch
+        if (userData.userType === 'athlete') {
           otherPartyName = deal.proposingBusinessName || 'Unknown Business';
-        } else if (userData.userType === 'business' && deal.athleteId) {
-          otherPartyId = deal.athleteId;
+        } else if (userData.userType === 'business') {
           otherPartyName = deal.athleteName || 'Unknown Athlete';
         }
 
-        // We already store names on the deal document, so no need to re-fetch user profiles
-        return { ...deal, otherPartyName, otherPartyId };
+        return { ...deal, otherPartyName };
       }));
 
       // Sort by latest timestamp (most recent deals first)
@@ -75,19 +71,30 @@ export default function MyDealsPage() {
         return timeB - timeA;
       });
 
-      setDeals(dealsList);
+      setAllDeals(dealsList); // Store all deals
       setLoading(false);
     });
 
     return () => unsubscribe();
   }, [router]);
 
+  // Use useMemo to filter deals based on selectedStatus
+  const filteredDeals = useMemo(() => {
+    if (selectedStatus === 'all') {
+      return allDeals;
+    }
+    return allDeals.filter(deal => deal.status === selectedStatus);
+  }, [allDeals, selectedStatus]);
+
+
   // Helper to format deal status
   const getStatusStyle = (status) => {
     switch (status) {
       case 'proposed': return { color: '#007bff', fontWeight: 'bold' };
       case 'accepted': return { color: '#28a745', fontWeight: 'bold' };
-      case 'rejected': return { color: '#dc3545', fontWeight: 'bold' };
+      case 'rejected': return { color: '#dc3545', color: 'white', fontWeight: 'bold' };
+      case 'paid': return { color: '#888', fontWeight: 'bold' };
+      case 'revoked': return { color: '#ffc107', fontWeight: 'bold' };
       default: return { color: '#6c757d' };
     }
   };
@@ -96,23 +103,37 @@ export default function MyDealsPage() {
     return <p>Loading your deals...</p>;
   }
 
-  if (!currentUser) {
-    return null; // Redirect handled by useEffect
-  }
-  
-  if (!currentUserData) {
-    return <p>Error: Could not load user data to fetch deals.</p>;
+  if (!currentUser || !currentUserData) {
+    return null;
   }
 
   return (
     <div style={{ padding: '20px', maxWidth: '800px', margin: '50px auto', border: '1px solid #ccc', borderRadius: '8px', backgroundColor: '#f9f9f9', color: '#333' }}>
       <h1 style={{ color: '#007bff', marginBottom: '20px' }}>My Deals</h1>
 
-      {deals.length === 0 ? (
-        <p>You have no active deals. Find an athlete or business to propose a deal!</p>
+      {/* Status Filter Dropdown */}
+      <div style={{ marginBottom: '20px', paddingBottom: '10px', borderBottom: '1px solid #eee' }}>
+        <label htmlFor="dealStatusFilter" style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Filter by Status:</label>
+        <select
+          id="dealStatusFilter"
+          value={selectedStatus}
+          onChange={(e) => setSelectedStatus(e.target.value)}
+          style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
+        >
+          <option value="all">All Deals</option>
+          <option value="proposed">Proposed</option>
+          <option value="accepted">Accepted</option>
+          <option value="rejected">Rejected</option>
+          <option value="paid">Paid (Finalized)</option>
+          <option value="revoked">Revoked</option> {/* NEW: Option for Revoked */}
+        </select>
+      </div>
+
+      {filteredDeals.length === 0 ? (
+        <p>You have no deals matching the selected criteria.</p>
       ) : (
         <div style={{ display: 'grid', gap: '15px' }}>
-          {deals.map(deal => (
+          {filteredDeals.map(deal => (
             <div 
               key={deal.id} 
               onClick={() => router.push(`/deal-details/${deal.id}`)} // Navigate to deal details page

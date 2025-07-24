@@ -40,8 +40,7 @@ export default function DealDetailsPage() {
             router.push('/dashboard');
             return;
           }
-          // FIX: Include the document ID (dealDocSnap.id) in the deal object
-          setDeal({ id: dealDocSnap.id, ...dealData });
+          setDeal({ id: dealDocSnap.id, ...dealData }); // Ensure ID is part of deal object
 
           // If deal is accepted and current user is the business, create a payment intent
           if (dealData.status === 'accepted' && dealData.proposingBusinessId === user.uid) {
@@ -69,7 +68,7 @@ export default function DealDetailsPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                   amount: amountInCents,
-                  dealId: dealData.id, // This was already passing the correct ID
+                  dealId: dealData.id,
                   athleteId: dealData.athleteId,
                   businessId: dealData.proposingBusinessId
                 }),
@@ -128,6 +127,24 @@ export default function DealDetailsPage() {
       setError('Failed to reject deal. Please try again.');
     }
   };
+
+  const handleRevoke = async () => {
+    setError(null);
+    if (!confirm('Are you sure you want to revoke this deal proposal? This cannot be undone.')) {
+      return;
+    }
+    try {
+      const dealDocRef = doc(db, 'deals', chatId);
+      await updateDoc(dealDocRef, { status: 'revoked' }); // Set status to 'revoked'
+      setDeal({ ...deal, status: 'revoked' }); // Update local state
+      alert('Deal proposal has been revoked.');
+      router.push('/my-deals'); // Redirect back to My Deals
+    } catch (err) {
+      console.error('Error revoking deal:', err);
+      setError('Failed to revoke deal. Please try again.');
+    }
+  };
+
 
   if (loading) {
     return <p>Loading deal details...</p>;
@@ -204,6 +221,18 @@ export default function DealDetailsPage() {
         </div>
       )}
       
+      {/* NEW: Revoke Deal Button - visible to Business if status is 'proposed' OR 'accepted' but NOT 'paid' */}
+      {isCurrentUserBusiness && (deal.status === 'proposed' || deal.status === 'accepted') && ( // MODIFIED CONDITION
+        <div style={{ marginTop: '30px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
+          <button
+            onClick={handleRevoke}
+            style={{ padding: '10px 15px', backgroundColor: '#ffc107', color: 'black', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
+          >
+            Revoke Deal
+          </button>
+        </div>
+      )}
+
       {/* Payment Section for Business (if deal accepted) */}
       {isCurrentUserBusiness && deal.status === 'accepted' && (
         <div style={{ marginTop: '30px', borderTop: '1px solid #eee', paddingTop: '15px' }}>
@@ -242,6 +271,7 @@ const getStatusStyle = (status) => {
     case 'accepted': return { color: '#28a745', fontWeight: 'bold' };
     case 'rejected': return { color: '#dc3545', color: 'white', fontWeight: 'bold' };
     case 'paid': return { color: '#888', fontWeight: 'bold' };
+    case 'revoked': return { color: '#ffc107', fontWeight: 'bold' };
     default: return { color: '#6c757d' };
   }
 };
@@ -257,17 +287,13 @@ function CheckoutForm({ deal, clientSecret, setParentPaymentSuccess, setParentPa
   const [paymentError, setPaymentError] = useState(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
-  console.log("CheckoutForm: Component Rendered. Deal prop:", deal);
-
   const handleSubmit = async (event) => {
     event.preventDefault();
     setProcessing(true);
     setPaymentError(null);
     setParentPaymentError(null);
 
-    console.log("CheckoutForm: handleSubmit called. Deal prop AT SUBMIT:", deal);
-
-    // FIX: Check if deal object is not null/undefined and has an ID
+    // Check if deal object is not null/undefined here
     if (!deal || !deal.id) {
         const msg = "Deal information missing for payment submission (CheckoutForm).";
         setPaymentError(msg);

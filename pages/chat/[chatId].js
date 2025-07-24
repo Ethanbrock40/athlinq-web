@@ -9,7 +9,7 @@ import {
   onSnapshot,
   addDoc,
   serverTimestamp,
-  doc, getDoc, setDoc, updateDoc // Import updateDoc
+  doc, getDoc, setDoc, updateDoc
 } from 'firebase/firestore';
 import { auth, db } from '../../lib/firebaseConfig';
 
@@ -72,7 +72,7 @@ export default function ChatPage() {
           }));
           setMessages(fetchedMessages);
 
-          // NEW: Mark chat as read for the current user when messages are fetched
+          // Mark chat as read for the current user when messages are fetched
           if (user && currentUserDocSnap.exists()) {
               const chatReadStatusPath = `chatsLastRead.${chatId}`; // Use dot notation for nested field
               updateDoc(currentUserDocRef, {
@@ -84,15 +84,22 @@ export default function ChatPage() {
           console.error("Error fetching messages:", error);
         });
 
+        // Fetch proposed deal (if any)
         const dealDocRef = doc(db, 'deals', chatId);
-        const dealDocSnap = await getDoc(dealDocRef);
-        if (dealDocSnap.exists()) {
-          setProposedDeal(dealDocSnap.data());
-        } else {
-            setProposedDeal(null);
-        }
+        const unsubscribeDeal = onSnapshot(dealDocRef, (docSnap) => { // Use onSnapshot for real-time deal updates
+            if (docSnap.exists()) {
+                setProposedDeal(docSnap.data());
+            } else {
+                setProposedDeal(null);
+            }
+        }, (error) => {
+            console.error("Error fetching deal details:", error);
+        });
 
-        return () => unsubscribeSnapshot();
+        return () => {
+            unsubscribeSnapshot(); // Clean up messages listener
+            unsubscribeDeal(); // Clean up deal listener
+        };
       }
     });
 
@@ -168,7 +175,8 @@ export default function ChatPage() {
         Chat with {recipientName}
       </h1>
 
-      {proposedDeal && (
+      {/* NEW: Proposed Deal Display - Only if exists AND status is NOT 'paid' */}
+      {proposedDeal && proposedDeal.status !== 'paid' && (
         <div style={{ border: '1px solid #ddd', padding: '15px', borderRadius: '8px', backgroundColor: '#fff', marginBottom: '15px' }}>
           <h2 style={{ color: '#007bff', margin: '0 0 10px 0' }}>Proposed Deal</h2>
           <p><strong>Title:</strong> {proposedDeal.dealTitle || 'N/A'}</p>
@@ -241,8 +249,8 @@ export default function ChatPage() {
         </button>
       </form>
       
-      {/* Conditional Propose Deal Button (only if business chatting with athlete) */}
-      {showProposeDealButton && (
+      {/* Conditional Propose Deal Button (only if business chatting with athlete and deal is not paid) */}
+      {showProposeDealButton && proposedDeal?.status !== 'paid' && ( // Added proposedDeal?.status !== 'paid'
         <button
           onClick={() => router.push(`/propose-deal/${recipientData.uid}`)}
           style={{ 

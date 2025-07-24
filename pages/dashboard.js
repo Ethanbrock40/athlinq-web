@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore'; // Added updateDoc
+import { doc, getDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 
 import { auth, db } from '../lib/firebaseConfig';
 
@@ -10,7 +10,7 @@ export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState(null);
-  const [stripeConnectStatus, setStripeConnectStatus] = useState('not_connected');
+  const [stripeConnectStatus, setStripeConnectStatus] = useState('not_connected'); // 'not_connected', 'pending_onboarding', 'connected'
   const router = useRouter();
 
   useEffect(() => {
@@ -24,8 +24,22 @@ export default function Dashboard() {
           const data = userDocSnap.data();
           setUserData(data);
 
+          // Check for Stripe Connect Account status
           if (data.stripeAccountId) {
-            setStripeConnectStatus('connected');
+            // Check if user just returned from a completed Stripe onboarding
+            const urlParams = new URLSearchParams(window.location.search);
+            const onboardingComplete = urlParams.get('stripe_onboarding_complete');
+
+            if (onboardingComplete === 'true') {
+              // OPTIONAL: You might want to query Stripe API here to confirm account.details_submitted
+              // For MVP, we assume it's connected if param is true and ID exists
+              setStripeConnectStatus('connected');
+              // Clear the query parameter from URL after processing
+              router.replace('/dashboard', undefined, { shallow: true });
+            } else {
+              // If ID exists but no 'complete' param, assume pending or partially set up
+              setStripeConnectStatus('pending_onboarding');
+            }
           } else {
             setStripeConnectStatus('not_connected');
           }
@@ -59,16 +73,13 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           userId: user.uid, 
-          userEmail: user.email // FIX: Send the user's actual email
+          userEmail: user.email 
         }),
       });
       const data = await response.json();
 
       if (response.ok && data.url) {
-        const userDocRef = doc(db, 'users', user.uid);
-        await updateDoc(userDocRef, {
-            stripeAccountId: data.stripeAccountId,
-        });
+        // The API route now handles storing stripeAccountId if new
         setStripeConnectStatus('pending_onboarding');
         window.location.href = data.url;
       } else {
