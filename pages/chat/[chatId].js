@@ -22,7 +22,7 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
   const [recipientName, setRecipientName] = useState('Recipient');
   const [recipientData, setRecipientData] = useState(null);
-  const [proposedDeal, setProposedDeal] = useState(null); // Keep this to display the LATEST deal
+  const [proposedDeal, setProposedDeal] = useState(null);
   const router = useRouter();
   const { chatId } = router.query;
 
@@ -195,6 +195,47 @@ export default function ChatPage() {
         </div>
       )}
 
+      {/* Message Display Area */}
+      <div style={{ 
+        flexGrow: 1, 
+        overflowY: 'auto',
+        border: '1px solid #ddd', 
+        padding: '15px', 
+        borderRadius: '8px', 
+        backgroundColor: '#fff', 
+        marginBottom: '15px' 
+      }}>
+        {messages.length === 0 ? (
+          <p style={{ textAlign: 'center', color: '#666' }}>Send your first message!</p>
+        ) : (
+          messages.map(msg => (
+            <div 
+              key={msg.id} 
+              style={{ 
+                marginBottom: '10px', 
+                textAlign: msg.senderId === currentUser.uid ? 'right' : 'left',
+              }}
+            >
+              <span style={{ 
+                display: 'inline-block', 
+                padding: '8px 12px', 
+                borderRadius: '15px', 
+                backgroundColor: msg.senderId === currentUser.uid ? '#dcf8c6' : '#e0e0e0',
+                color: '#333',
+                maxWidth: '70%',
+                wordWrap: 'break-word'
+              }}>
+                {msg.text}
+              </span>
+              <div style={{ fontSize: '0.75em', color: '#888', marginTop: '4px' }}>
+                {msg.senderId === currentUser.uid ? 'You' : msg.senderEmail || 'Them'} - {msg.timestamp}
+              </div>
+            </div>
+          ))
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
       {/* Message Input Form */}
       <div style={{display: 'flex', flexDirection: 'column', gap: '15px'}}>
         <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -213,8 +254,22 @@ export default function ChatPage() {
           </button>
         </form>
         
-        {/* Removed the Propose Deal button from here */}
-        
+        {showProposeDealButton && (!proposedDeal || proposedDeal.status === 'paid' || proposedDeal.status === 'rejected' || proposedDeal.status === 'revoked') && (
+          <button
+            onClick={() => router.push(`/propose-deal/${recipientData.uid}`)}
+            style={{ 
+              width: '100%', 
+              padding: '10px 15px', 
+              backgroundColor: '#ffaa00', 
+              color: 'black', 
+              border: 'none', 
+              borderRadius: '5px', 
+              cursor: 'pointer' 
+            }}
+          >
+            Propose New Deal to {recipientName.split(' ')[0]}
+          </button>
+        )}
       </div>
 
       <button 
