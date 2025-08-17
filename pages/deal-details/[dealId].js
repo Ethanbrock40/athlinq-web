@@ -1,4 +1,4 @@
-// pages/deal-details/[chatId].js
+// pages/deal-details/[dealId].js (RENAME FILE: [chatId].js -> [dealId].js)
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -10,6 +10,9 @@ import { loadStripe } from '@stripe/stripe-js';
 // Load Stripe.js outside of a component’s render to avoid recreating the Stripe object on every render.
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
+// Define your platform's commission rate
+const PLATFORM_COMMISSION_PERCENTAGE = 0.10; // 10%
+
 export default function DealDetailsPage() {
   const [currentUser, setCurrentUser] = useState(null);
   const [deal, setDeal] = useState(null);
@@ -19,7 +22,7 @@ export default function DealDetailsPage() {
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const router = useRouter();
-  const { chatId } = router.query;
+  const { dealId } = router.query; // NEW: Get dealId from the URL
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
@@ -29,8 +32,8 @@ export default function DealDetailsPage() {
       }
       setCurrentUser(user);
 
-      if (chatId) {
-        const dealDocRef = doc(db, 'deals', chatId);
+      if (dealId) { // NEW: Use dealId here
+        const dealDocRef = doc(db, 'deals', dealId); // NEW: Fetch by dealId
         const dealDocSnap = await getDoc(dealDocRef);
 
         if (dealDocSnap.exists()) {
@@ -61,16 +64,33 @@ export default function DealDetailsPage() {
                   return;
               }
               
-              const amountInCents = Math.round(amountValue * 100);
+              const athletePayoutAmount = amountValue;
+              const platformFee = Math.round(athletePayoutAmount * PLATFORM_COMMISSION_PERCENTAGE * 100);
+              const totalAmountToChargeBusiness = Math.round(athletePayoutAmount * 100) + platformFee;
+
+              // Ensure athlete's Stripe Account ID is available for payment
+              const athleteDocRef = doc(db, 'users', dealData.athleteId);
+              const athleteDocSnap = await getDoc(athleteDocRef);
+              const athleteStripeAccountId = athleteDocSnap.exists() ? athleteDocSnap.data().stripeAccountId : null;
+
+              if (!athleteStripeAccountId) {
+                setError('Athlete has not connected a Stripe account for payments.');
+                setPaymentProcessing(false);
+                return;
+              }
+
 
               const response = await fetch('/api/create-payment-intent', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                  amount: amountInCents,
-                  dealId: dealData.id,
+                  amount: totalAmountToChargeBusiness,
+                  applicationFeeAmount: platformFee,
+                  athletePayoutAmount: athletePayoutAmount * 100, // Pass athlete's payout in cents
+                  dealId: dealData.id, 
                   athleteId: dealData.athleteId,
-                  businessId: dealData.proposingBusinessId
+                  businessId: dealData.proposingBusinessId,
+                  athleteStripeAccountId: athleteStripeAccountId
                 }),
               });
               const data = await response.json();
@@ -89,7 +109,7 @@ export default function DealDetailsPage() {
           }
 
         } else {
-          console.log('No deal found for chatId:', chatId);
+          console.log('No deal found for dealId:', dealId); // NEW: log dealId
           setDeal(null);
           setError('Deal details not found.');
         }
@@ -98,12 +118,12 @@ export default function DealDetailsPage() {
     });
 
     return () => unsubscribeAuth();
-  }, [router, chatId]);
+  }, [router, dealId]); // NEW: Add dealId to dependencies
 
   const handleAccept = async () => {
     setError(null);
     try {
-      const dealDocRef = doc(db, 'deals', chatId);
+      const dealDocRef = doc(db, 'deals', deal.id); // Use deal.id here
       await updateDoc(dealDocRef, { status: 'accepted' });
       setDeal({ ...deal, status: 'accepted' });
       alert('Deal accepted!');
@@ -117,7 +137,7 @@ export default function DealDetailsPage() {
   const handleReject = async () => {
     setError(null);
     try {
-      const dealDocRef = doc(db, 'deals', chatId);
+      const dealDocRef = doc(db, 'deals', deal.id); // Use deal.id here
       await updateDoc(dealDocRef, { status: 'rejected' });
       setDeal({ ...deal, status: 'rejected' });
       alert('Deal rejected.');
@@ -134,11 +154,11 @@ export default function DealDetailsPage() {
       return;
     }
     try {
-      const dealDocRef = doc(db, 'deals', chatId);
-      await updateDoc(dealDocRef, { status: 'revoked' }); // Set status to 'revoked'
-      setDeal({ ...deal, status: 'revoked' }); // Update local state
+      const dealDocRef = doc(db, 'deals', deal.id); // Use deal.id here
+      await updateDoc(dealDocRef, { status: 'revoked' });
+      setDeal({ ...deal, status: 'revoked' });
       alert('Deal proposal has been revoked.');
-      router.push('/my-deals'); // Redirect back to My Deals
+      router.push('/my-deals');
     } catch (err) {
       console.error('Error revoking deal:', err);
       setError('Failed to revoke deal. Please try again.');
@@ -162,6 +182,10 @@ export default function DealDetailsPage() {
   const isCurrentUserAthlete = currentUser && deal.athleteId === currentUser.uid;
   const isCurrentUserBusiness = currentUser && deal.proposingBusinessId === currentUser.uid;
 
+  const athletePayoutAmountDisplay = parseFloat(deal.compensationAmount) || 0;
+  const platformFeeDisplay = Math.round(athletePayoutAmountDisplay * PLATFORM_COMMISSION_PERCENTAGE * 100) / 100;
+  const totalAmountToChargeBusinessDisplay = athletePayoutAmountDisplay + platformFeeDisplay;
+
 
   return (
     <div style={{ padding: '20px', maxWidth: '800px', margin: '50px auto', border: '1px solid #ccc', borderRadius: '8px', backgroundColor: '#f9f9f9', color: '#333' }}>
@@ -175,7 +199,9 @@ export default function DealDetailsPage() {
         <h2 style={{ color: '#007bff' }}>Deal Terms</h2>
         <p><strong>Deal Title:</strong> {deal.dealTitle}</p>
         <p><strong>Deliverables:</strong> {deal.deliverables}</p>
-        <p><strong>Compensation:</strong> {deal.compensationType} - {deal.compensationAmount}</p>
+        <p><strong>Athlete Receives:</strong> ${athletePayoutAmountDisplay.toFixed(2)}</p>
+        <p><strong>Platform Fee ({PLATFORM_COMMISSION_PERCENTAGE * 100}%):</strong> ${platformFeeDisplay.toFixed(2)}</p>
+        <p><strong>Total Charged to Business:</strong> ${totalAmountToChargeBusinessDisplay.toFixed(2)}</p>
         <p><strong>Payment Terms:</strong> {deal.paymentTerms}</p>
         <p><strong>Duration:</strong> {deal.duration}</p>
         <p><strong>Usage Rights:</strong> {deal.usageRights || 'N/A'}</p>
@@ -221,8 +247,8 @@ export default function DealDetailsPage() {
         </div>
       )}
       
-      {/* NEW: Revoke Deal Button - visible to Business if status is 'proposed' OR 'accepted' but NOT 'paid' */}
-      {isCurrentUserBusiness && (deal.status === 'proposed' || deal.status === 'accepted') && ( // MODIFIED CONDITION
+      {/* Revoke Deal Button - visible to Business if status is 'proposed' OR 'accepted' */}
+      {isCurrentUserBusiness && (deal.status === 'proposed' || deal.status === 'accepted') && (
         <div style={{ marginTop: '30px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
           <button
             onClick={handleRevoke}
@@ -363,8 +389,8 @@ function CheckoutForm({ deal, clientSecret, setParentPaymentSuccess, setParentPa
           opacity: (!stripe || processing) ? 0.7 : 1
         }}
       >
-        {processing ? 'Processing...' : `Pay $${deal.compensationAmount}`}
-      </button>
+        {processing ? 'Processing...' : `Pay $${totalAmountToChargeBusinessDisplay.toFixed(2)}`}
+      </button> {/* Updated button text */}
       {/* Display local paymentError */}
       {paymentError && <p style={{ color: 'red', marginTop: '10px' }}>{paymentError}</p>} 
       {/* Display local paymentSuccess */}

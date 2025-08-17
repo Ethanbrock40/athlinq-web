@@ -3,7 +3,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
-    const { amount, dealId, athleteId, businessId, athleteStripeAccountId } = req.body; // NEW: athleteStripeAccountId
+    const { amount, applicationFeeAmount, athletePayoutAmount, dealId, athleteId, businessId, athleteStripeAccountId } = req.body; // NEW: applicationFeeAmount, athletePayoutAmount
 
     if (!process.env.STRIPE_SECRET_KEY) {
       console.error('API Error: STRIPE_SECRET_KEY is not defined. Cannot proceed with payment intent creation.');
@@ -13,21 +13,27 @@ export default async function handler(req, res) {
     if (!athleteStripeAccountId) {
       return res.status(400).json({ statusCode: 400, message: 'Athlete Stripe Account ID is required for payment transfer.' });
     }
+    
+    // Ensure amounts are valid numbers
+    if (typeof amount !== 'number' || amount <= 0 ||
+        typeof applicationFeeAmount !== 'number' || applicationFeeAmount < 0 ||
+        typeof athletePayoutAmount !== 'number' || athletePayoutAmount <= 0) {
+        return res.status(400).json({ statusCode: 400, message: 'Invalid amount or fee provided.' });
+    }
 
-    // Calculate your platform's application fee (e.g., 10% of the deal amount)
-    // IMPORTANT: This is where you define your commission.
-    const applicationFeeAmount = Math.round(amount * 0.10); // 10% of the amount in cents
 
     try {
-      // Create a PaymentIntent with the order amount and currency
+      // Create a PaymentIntent with the total amount to charge the business
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount, // Total amount to charge the business (in cents)
         currency: 'usd',
-        payment_method_types: ['card'], // Specify card payment
+        payment_method_types: ['card'],
         
         // Use transfer_data to specify the connected account and application fee
         transfer_data: {
           destination: athleteStripeAccountId, // The athlete's connected account ID
+          // Stripe automatically calculates transfer amount as (charge.amount - application_fee_amount)
+          // So, no need for transfer_amount here if platform covers fees from application_fee_amount
         },
         application_fee_amount: applicationFeeAmount, // Your platform's fee (in cents)
         
@@ -35,8 +41,8 @@ export default async function handler(req, res) {
           deal_id: dealId,
           athlete_id: athleteId,
           business_id: businessId,
-          platform_fee: applicationFeeAmount,
-          transfer_amount: amount - applicationFeeAmount,
+          platform_fee_cents: applicationFeeAmount,
+          athlete_payout_cents: athletePayoutAmount, // Store athlete's payout amount in metadata
         },
       });
 

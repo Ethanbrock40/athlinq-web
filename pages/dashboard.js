@@ -10,7 +10,9 @@ export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState(null);
-  const [stripeConnectStatus, setStripeConnectStatus] = useState('not_connected'); // 'not_connected', 'pending_onboarding', 'connected'
+  const [stripeConnectStatus, setStripeConnectStatus] = useState('not_connected');
+  const [chattedAthletes, setChattedAthletes] = useState([]); // NEW: State for athletes the business has chatted with
+  const [selectedAthleteId, setSelectedAthleteId] = useState(''); // NEW: State for selected athlete
   const router = useRouter();
 
   useEffect(() => {
@@ -24,25 +26,38 @@ export default function Dashboard() {
           const data = userDocSnap.data();
           setUserData(data);
 
-          // Check for Stripe Connect Account status
           if (data.stripeAccountId) {
-            // Check if user just returned from a completed Stripe onboarding
-            const urlParams = new URLSearchParams(window.location.search);
-            const onboardingComplete = urlParams.get('stripe_onboarding_complete');
-
-            if (onboardingComplete === 'true') {
-              // OPTIONAL: You might want to query Stripe API here to confirm account.details_submitted
-              // For MVP, we assume it's connected if param is true and ID exists
-              setStripeConnectStatus('connected');
-              // Clear the query parameter from URL after processing
-              router.replace('/dashboard', undefined, { shallow: true });
-            } else {
-              // If ID exists but no 'complete' param, assume pending or partially set up
-              setStripeConnectStatus('pending_onboarding');
-            }
+            setStripeConnectStatus('pending_onboarding');
           } else {
             setStripeConnectStatus('not_connected');
           }
+
+          // NEW: Fetch all chats for the current user
+          const chatsCollectionRef = collection(db, 'chats');
+          const q1 = query(chatsCollectionRef, where('participant1Id', '==', currentUser.uid));
+          const q2 = query(chatsCollectionRef, where('participant2Id', '==', currentUser.uid));
+          
+          const [snapshot1, snapshot2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+          let chats = {};
+          snapshot1.docs.forEach(doc => { chats[doc.id] = { id: doc.id, ...doc.data() }; });
+          snapshot2.docs.forEach(doc => { chats[doc.id] = { id: doc.id, ...doc.data() }; });
+          const activeChatsList = Object.values(chats);
+
+          // Find athletes among the chat participants
+          const athletesInChats = [];
+          for (const chat of activeChatsList) {
+            const otherParticipantId = chat.participant1Id === currentUser.uid ? chat.participant2Id : chat.participant1Id;
+            const otherParticipantDocRef = doc(db, 'users', otherParticipantId);
+            const otherParticipantDocSnap = await getDoc(otherParticipantDocRef);
+            if (otherParticipantDocSnap.exists() && otherParticipantDocSnap.data().userType === 'athlete') {
+              const athleteData = otherParticipantDocSnap.data();
+              athletesInChats.push({
+                uid: otherParticipantId,
+                name: `${athleteData.firstName} ${athleteData.lastName}`,
+              });
+            }
+          }
+          setChattedAthletes(athletesInChats);
         } else {
           console.log('No user data found for current user.');
         }
@@ -79,7 +94,10 @@ export default function Dashboard() {
       const data = await response.json();
 
       if (response.ok && data.url) {
-        // The API route now handles storing stripeAccountId if new
+        const userDocRef = doc(db, 'users', user.uid);
+        await updateDoc(userDocRef, {
+            stripeAccountId: data.stripeAccountId,
+        });
         setStripeConnectStatus('pending_onboarding');
         window.location.href = data.url;
       } else {
@@ -183,6 +201,39 @@ export default function Dashboard() {
           Logout
         </button>
       </div>
+
+      {/* NEW: Propose Deal Section (for businesses only) */}
+      {userData.userType === 'business' && chattedAthletes.length > 0 && (
+        <div style={{ marginTop: '40px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
+          <h2 style={{ color: '#007bff' }}>Propose a New Deal</h2>
+          <select
+            value={selectedAthleteId}
+            onChange={(e) => setSelectedAthleteId(e.target.value)}
+            style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', marginBottom: '15px' }}
+          >
+            <option value="">Select an Athlete</option>
+            {chattedAthletes.map(athlete => (
+              <option key={athlete.uid} value={athlete.uid}>{athlete.name}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => router.push(`/propose-deal/${selectedAthleteId}`)}
+            disabled={!selectedAthleteId} // Disable button if no athlete is selected
+            style={{ 
+              width: '100%', 
+              padding: '10px 15px', 
+              backgroundColor: '#28a745', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '5px', 
+              cursor: 'pointer',
+              opacity: selectedAthleteId ? 1 : 0.5
+            }}
+          >
+            Propose Deal to Selected Athlete
+          </button>
+        </div>
+      )}
     </div>
   );
 }
