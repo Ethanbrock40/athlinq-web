@@ -1,7 +1,7 @@
 // pages/api/create-connect-account.js
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-import { doc, getDoc, updateDoc } from 'firebase/firestore'; // Import Firestore
-import { db } from '../../lib/firebaseConfig'; // Import db
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { db } from '../../lib/firebaseConfig';
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
@@ -18,13 +18,11 @@ export default async function handler(req, res) {
     }
 
     try {
-      // Check if user already has a Stripe account ID in Firestore
       const userDocRef = doc(db, 'users', userId);
       const userDocSnap = await getDoc(userDocRef);
       const userData = userDocSnap.data();
       let stripeAccountId = userData?.stripeAccountId;
 
-      // If no existing Stripe account ID, create a new one
       if (!stripeAccountId) {
           const account = await stripe.accounts.create({
             type: 'express',
@@ -35,22 +33,23 @@ export default async function handler(req, res) {
               transfers: { requested: true },
             },
             business_type: 'individual',
-            // You can prefill more info here if you collect it during signup
           });
           stripeAccountId = account.id;
 
-          // Store the new Stripe account ID in Firestore
           await updateDoc(userDocRef, {
               stripeAccountId: stripeAccountId,
           });
       }
 
-      // Create an account link for the athlete to onboard/resume onboarding
+      if (!stripeAccountId) {
+          return res.status(500).json({ message: 'Stripe account ID is not available.' });
+      }
+
       const accountLink = await stripe.accountLinks.create({
-        account: stripeAccountId, // Use the existing or newly created account ID
+        account: stripeAccountId,
         refresh_url: refreshUrl,
         return_url: returnUrl,
-        type: 'account_onboarding', // For full onboarding flow
+        type: 'account_onboarding',
       });
 
       res.status(200).json({ url: accountLink.url, stripeAccountId: stripeAccountId });
