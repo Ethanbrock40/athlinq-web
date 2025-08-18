@@ -95,83 +95,143 @@ export default function Dashboard() {
     : userData.userType === 'business'
       ? userData.companyName || userData.email
       : userData.email;
+      
+  const profileImageUrl = userData.userType === 'athlete' 
+    ? userData.profileImageUrl 
+    : userData.businessLogoUrl;
+
 
   return (
-    <div style={{ padding: '20px', maxWidth: '800px', margin: '50px auto', border: '1px solid #ccc', borderRadius: '8px' }}>
-      <h1>Welcome to your AthLinq Dashboard!</h1>
-      <p>Hello, {displayName}!</p>
-      <p>This is a protected page. Only logged-in users can see this content.</p>
+    <div style={{ 
+        fontFamily: 'Arial, sans-serif',
+        backgroundColor: '#121212',
+        color: '#e0e0e0',
+        minHeight: '100vh',
+        display: 'flex',
+        justifyContent: 'center',
+        padding: '20px'
+    }}>
+      <div style={{ 
+          maxWidth: '900px',
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '20px'
+      }}>
+        
+        {/* User Profile Card */}
+        <div style={{ 
+            backgroundColor: '#1e1e1e', 
+            padding: '25px', 
+            borderRadius: '12px', 
+            boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '20px'
+        }}>
+          {profileImageUrl && (
+            <img 
+              src={profileImageUrl} 
+              alt="Profile" 
+              style={{ 
+                  width: '80px', 
+                  height: '80px', 
+                  borderRadius: userData.userType === 'athlete' ? '50%' : '8px',
+                  objectFit: userData.userType === 'athlete' ? 'cover' : 'contain',
+                  border: '2px solid #007bff' 
+              }} 
+            />
+          )}
+          <div>
+            <h1 style={{ margin: 0, fontSize: '2em', color: '#007bff' }}>Hello, {displayName}!</h1>
+            <p style={{ margin: 0, color: '#aaa' }}>Welcome to your AthLinq Dashboard.</p>
+          </div>
+        </div>
 
-      <div style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-        {/* Button to go to user's own profile */}
-        {userData.userType === 'athlete' && (
-          <button 
-            onClick={() => router.push('/athlete-profile')}
-            style={{ padding: '10px 15px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
-          >
-            Go to My Profile
-          </button>
-        )}
-        {userData.userType === 'business' && (
-          <button 
-            onClick={() => router.push('/business-profile')}
-            style={{ padding: '10px 15px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
-          >
-            Go to My Profile
-          </button>
-        )}
-
-        {/* Conditional buttons to find other user types */}
-        {userData.userType === 'athlete' && (
-          <button 
-            onClick={() => router.push('/find-businesses')}
-            style={{ padding: '10px 15px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
-          >
-            Find your next deal
-          </button>
-        )}
-        {userData.userType === 'business' && (
-          <button 
-            onClick={() => router.push('/find-athletes')}
-            style={{ padding: '10px 15px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
-          >
-            Find Athletes
-          </button>
-        )}
-
-        {/* Messages Inbox Button */}
-        <button 
-          onClick={() => router.push('/inbox')}
-          style={{ padding: '10px 15px', backgroundColor: '#ffc107', color: 'black', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
-        >
-          Messages (Inbox)
-        </button>
-
-        {/* My Deals Button */}
-        <button 
-          onClick={() => router.push('/my-deals')}
-          style={{ padding: '10px 15px', backgroundColor: '#6f42c1', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
-        >
-          My Deals
-        </button>
-
-        {/* Connect Stripe Account Button (for Athletes only) */}
-        {userData.userType === 'athlete' && stripeConnectStatus !== 'connected' && (
-          <button 
-            onClick={handleConnectStripe}
-            style={{ padding: '10px 15px', backgroundColor: '#6772E5', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
-          >
-            {stripeConnectStatus === 'pending_onboarding' ? 'Continue Stripe Setup' : 'Connect Stripe Account'}
-          </button>
-        )}
-
-        <button
-          onClick={handleLogout}
-          style={{ padding: '10px 15px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
-        >
-          Logout
-        </button>
+        {/* Action Buttons Grid */}
+        <div style={{ 
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '15px'
+        }}>
+            <ActionButton 
+                text="My Profile" 
+                icon="👤" 
+                onClick={() => router.push(userData.userType === 'athlete' ? '/athlete-profile' : '/business-profile')} 
+                backgroundColor="#007bff"
+            />
+            {userData.userType === 'athlete' && (
+                <ActionButton 
+                    text="Find your next deal" 
+                    icon="💼" 
+                    onClick={() => router.push('/find-businesses')} 
+                    backgroundColor="#28a745"
+                />
+            )}
+            {userData.userType === 'business' && (
+                <ActionButton 
+                    text="Find Athletes" 
+                    icon="🏃‍♂️" 
+                    onClick={() => router.push('/find-athletes')} 
+                    backgroundColor="#28a745"
+                />
+            )}
+            <ActionButton 
+                text="Messages (Inbox)" 
+                icon="✉️" 
+                onClick={() => router.push('/inbox')} 
+                backgroundColor="#ffc107"
+            />
+            <ActionButton 
+                text="My Deals" 
+                icon="🤝" 
+                onClick={() => router.push('/my-deals')} 
+                backgroundColor="#6f42c1"
+            />
+            {userData.userType === 'athlete' && stripeConnectStatus !== 'connected' && (
+                <ActionButton 
+                    text={stripeConnectStatus === 'pending_onboarding' ? 'Continue Stripe Setup' : 'Connect Stripe Account'}
+                    icon="💳" 
+                    onClick={handleConnectStripe} 
+                    backgroundColor="#6772E5"
+                />
+            )}
+             <ActionButton 
+                text="Logout" 
+                icon="🚪" 
+                onClick={handleLogout} 
+                backgroundColor="#dc3545"
+            />
+        </div>
       </div>
     </div>
   );
 }
+
+// --- ActionButton Component (to be placed in the same file for now) ---
+const ActionButton = ({ text, icon, onClick, backgroundColor }) => (
+    <button 
+        onClick={onClick}
+        style={{
+            backgroundColor: backgroundColor,
+            color: 'white',
+            padding: '20px',
+            border: 'none',
+            borderRadius: '12px',
+            fontSize: '1.2em',
+            fontWeight: 'bold',
+            textAlign: 'left',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease-in-out',
+            boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '15px',
+        }}
+        onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
+        onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+    >
+        <span style={{ fontSize: '1.5em' }}>{icon}</span>
+        {text}
+    </button>
+);

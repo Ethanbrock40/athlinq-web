@@ -2,30 +2,28 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth, db } from '../lib/firebaseConfig'; // Import 'db' from firebaseConfig
-import { doc, setDoc } from 'firebase/firestore'; // Import Firestore functions
+import { auth, db } from '../lib/firebaseConfig';
+import { doc, setDoc } from 'firebase/firestore';
 
 export default function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [firstName, setFirstName] = useState(''); // State for athlete's first name
-  const [lastName, setLastName] = useState(''); // State for athlete's last name
-  const [companyName, setCompanyName] = useState(''); // New state for business's company name
-  const [userType, setUserType] = useState('athlete'); // Default to athlete
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [userType, setUserType] = useState('athlete');
   const [error, setError] = useState(null);
   const router = useRouter();
 
   const handleSignup = async (e) => {
     e.preventDefault();
-    setError(null); // Clear previous errors
+    setError(null);
 
     try {
-      // 1. Create user with Firebase Authentication
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       console.log('Signed up user:', user.email);
 
-      // 2. Prepare user data to store in Firestore based on userType
       let userDataToStore = {
         uid: user.uid,
         email: user.email,
@@ -40,13 +38,16 @@ export default function Signup() {
         userDataToStore.companyName = companyName;
       }
 
-      // 3. Store additional user data in Firestore
-      // We create a document in the 'users' collection with the user's UID as the ID
       await setDoc(doc(db, "users", user.uid), userDataToStore);
       console.log('User data saved to Firestore:', user.uid);
 
-      // Redirect to a protected page or dashboard after successful signup
-      router.push('/dashboard');
+      if (userType === 'athlete') {
+        router.push('/athlete-profile');
+      } else if (userType === 'business') {
+        router.push('/business-profile');
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err) {
       console.error('Signup error:', err.message);
       setError(err.message);
@@ -79,27 +80,6 @@ export default function Signup() {
             style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
           />
         </div>
-
-        <div style={{ marginBottom: '20px' }}>
-          <label htmlFor="userType" style={{ display: 'block', marginBottom: '5px' }}>I am a:</label>
-          <select
-            id="userType"
-            value={userType}
-            onChange={(e) => {
-              setUserType(e.target.value);
-              // Clear name/company fields when user type changes
-              setFirstName('');
-              setLastName('');
-              setCompanyName('');
-            }}
-            style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
-          >
-            <option value="athlete">Athlete</option>
-            <option value="business">Business</option>
-          </select>
-        </div>
-
-        {/* Conditional Rendering based on userType */}
         {userType === 'athlete' && (
           <>
             <div style={{ marginBottom: '15px' }}>
@@ -126,7 +106,6 @@ export default function Signup() {
             </div>
           </>
         )}
-
         {userType === 'business' && (
           <div style={{ marginBottom: '15px' }}>
             <label htmlFor="companyName" style={{ display: 'block', marginBottom: '5px' }}>Company Name:</label>
@@ -140,7 +119,23 @@ export default function Signup() {
             />
           </div>
         )}
-
+        <div style={{ marginBottom: '20px' }}>
+          <label htmlFor="userType" style={{ display: 'block', marginBottom: '5px' }}>I am a:</label>
+          <select
+            id="userType"
+            value={userType}
+            onChange={(e) => {
+              setUserType(e.target.value);
+              setFirstName('');
+              setLastName('');
+              setCompanyName('');
+            }}
+            style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
+          >
+            <option value="athlete">Athlete</option>
+            <option value="business">Business</option>
+          </select>
+        </div>
         <button type="submit" style={{ width: '100%', padding: '10px', backgroundColor: '#0070f3', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
           Sign Up
         </button>

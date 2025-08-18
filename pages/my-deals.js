@@ -90,12 +90,12 @@ export default function MyDealsPage() {
   // Helper to format deal status
   const getStatusStyle = (status) => {
     switch (status) {
-      case 'proposed': return { color: '#007bff', fontWeight: 'bold' };
-      case 'accepted': return { color: '#28a745', fontWeight: 'bold' };
-      case 'rejected': return { color: '#dc3545', color: 'white', fontWeight: 'bold' };
-      case 'paid': return { color: '#888', fontWeight: 'bold' };
-      case 'revoked': return { color: '#ffc107', fontWeight: 'bold' };
-      default: return { color: '#6c757d' };
+      case 'proposed': return { backgroundColor: '#007bff', color: 'white', fontWeight: 'bold', padding: '4px 8px', borderRadius: '4px' };
+      case 'accepted': return { backgroundColor: '#28a745', color: 'white', fontWeight: 'bold', padding: '4px 8px', borderRadius: '4px' };
+      case 'rejected': return { backgroundColor: '#dc3545', color: 'white', fontWeight: 'bold', padding: '4px 8px', borderRadius: '4px' };
+      case 'paid': return { backgroundColor: '#6c757d', color: 'white', fontWeight: 'bold', padding: '4px 8px', borderRadius: '4px' };
+      case 'revoked': return { backgroundColor: '#ffc107', color: 'black', fontWeight: 'bold', padding: '4px 8px', borderRadius: '4px' };
+      default: return { backgroundColor: '#6c757d', color: 'white', padding: '4px 8px', borderRadius: '4px' };
     }
   };
 
@@ -125,7 +125,7 @@ export default function MyDealsPage() {
           <option value="accepted">Accepted</option>
           <option value="rejected">Rejected</option>
           <option value="paid">Paid (Finalized)</option>
-          <option value="revoked">Revoked</option> {/* NEW: Option for Revoked */}
+          <option value="revoked">Revoked</option>
         </select>
       </div>
 
@@ -136,7 +136,7 @@ export default function MyDealsPage() {
           {filteredDeals.map(deal => (
             <div 
               key={deal.id} 
-              onClick={() => router.push(`/deal-details/${deal.id}`)} // Navigate to deal details page
+              onClick={() => router.push(`/deal-details/${deal.id}`)}
               style={{ 
                 border: '1px solid #ddd', 
                 padding: '15px', 
@@ -145,20 +145,25 @@ export default function MyDealsPage() {
                 cursor: 'pointer',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                 transition: 'transform 0.1s ease-in-out',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
               }}
               onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
               onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
             >
-              <h3 style={{ margin: '0 0 5px 0', color: '#333' }}>{deal.dealTitle || 'Unnamed Deal'}</h3>
-              <p style={{ margin: '0 0 5px 0' }}>
-                {currentUserData.userType === 'athlete' ? 'From:' : 'To:'} <strong>{deal.otherPartyName}</strong>
-              </p>
-              <p style={{ margin: '0 0 5px 0' }}>
-                Status: <span style={getStatusStyle(deal.status)}>{deal.status.charAt(0).toUpperCase() + deal.status.slice(1)}</span>
-              </p>
-              <p style={{ fontSize: '0.85em', color: '#888', margin: 0 }}>
-                Proposed: {deal.timestamp ? deal.timestamp.toDate().toLocaleString() : 'N/A'}
-              </p>
+              <div>
+                <h3 style={{ margin: '0 0 5px 0', color: '#333' }}>{deal.dealTitle || 'Unnamed Deal'}</h3>
+                <p style={{ margin: '0 0 5px 0' }}>
+                  {currentUserData.userType === 'athlete' ? 'From:' : 'To:'} <strong>{deal.otherPartyName}</strong>
+                </p>
+                <p style={{ fontSize: '0.85em', color: '#888', margin: 0 }}>
+                  Proposed: {deal.timestamp ? deal.timestamp.toDate().toLocaleString() : 'N/A'}
+                </p>
+              </div>
+              <div>
+                <span style={getStatusStyle(deal.status)}>{deal.status.charAt(0).toUpperCase() + deal.status.slice(1)}</span>
+              </div>
             </div>
           ))}
         </div>
