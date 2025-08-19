@@ -121,7 +121,7 @@ export default function Dashboard() {
         <nav style={{
             width: '100%',
             backgroundColor: '#1a1a1a',
-            padding: '15px 30px',
+            padding: '10px 30px', // Adjusted padding to accommodate much larger logo
             boxShadow: '0 2px 10px rgba(0,0,0,0.5)',
             display: 'flex',
             justifyContent: 'space-between',
@@ -132,10 +132,10 @@ export default function Dashboard() {
             {/* Left side: AthLinq Logo */}
             <div style={{ display: 'flex', alignItems: 'center' }}>
                 <img 
-                    src="https://raw.githubusercontent.com/Ethanbrock40/athlinq-web/main/public/AthLinq%20no%20BG.jpg" 
+                    src="/Athlinq no BG.png" 
                     alt="AthLinq Logo" 
                     style={{ 
-                        height: '35px', // Adjusted size for top bar
+                        height: '100px', // Increased height for a much bigger logo
                         marginRight: '10px'
                     }} 
                 />
@@ -211,10 +211,27 @@ export default function Dashboard() {
                 padding: '30px', 
                 borderRadius: '12px', 
                 boxShadow: '0 6px 12px rgba(0,0,0,0.3)',
-                textAlign: 'center'
+                textAlign: 'center',
+                display: 'flex', // Use flexbox for alignment
+                alignItems: 'center',
+                justifyContent: 'center', // Center content horizontally
+                gap: '20px' // Space between logo and text
             }}>
-                <h2 style={{ margin: '0 0 10px 0', fontSize: '2.5em', color: '#007bff' }}>Welcome, {displayName}!</h2>
-                <p style={{ margin: 0, fontSize: '1.1em', color: '#aaa' }}>Your hub for NIL opportunities.</p>
+                {/* NEW: Large App Icon */}
+                <img 
+                    src="/Linq App Icon.png" // Assuming this path for the new icon
+                    alt="App Icon" 
+                    style={{ 
+                        height: '100px', // Adjust size as needed
+                        width: '100px', // Keep aspect ratio
+                        borderRadius: '15px', // Rounded corners for the icon
+                        boxShadow: '0 0 15px rgba(0,123,255,0.5)' // Subtle glow
+                    }} 
+                />
+                <div>
+                    <h2 style={{ margin: '0 0 10px 0', fontSize: '2.5em', color: '#007bff' }}>Welcome, {displayName}!</h2>
+                    <p style={{ margin: 0, fontSize: '1.1em', color: '#aaa' }}>Your hub for NIL opportunities.</p>
+                </div>
             </div>
 
             {/* Action Cards Grid */}
