@@ -10,7 +10,7 @@ export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState(null);
-  const [stripeConnectStatus, setStripeConnectStatus] = useState('not_connected');
+  const [stripeConnectStatus, setStripeConnectStatus] = useState('not_connected'); // 'not_connected', 'pending_onboarding', 'connected'
   const router = useRouter();
 
   useEffect(() => {
@@ -24,8 +24,9 @@ export default function Dashboard() {
           const data = userDocSnap.data();
           setUserData(data);
 
+          // Check for Stripe Connect Account status
           if (data.stripeAccountId) {
-            setStripeConnectStatus('pending_onboarding');
+            setStripeConnectStatus('pending_onboarding'); // Assume pending if ID exists but not fully "connected" via API check
           } else {
             setStripeConnectStatus('not_connected');
           }
@@ -81,13 +82,18 @@ export default function Dashboard() {
     }
   };
 
+  // Function to navigate to user's own profile page
+  const goToMyProfile = () => {
+    router.push(userData.userType === 'athlete' ? '/athlete-profile' : '/business-profile');
+  };
+
 
   if (loading) {
-    return <p>Loading dashboard...</p>;
+    return <p style={{ color: 'white', textAlign: 'center', marginTop: '50px', fontFamily: 'Arial, sans-serif' }}>Loading dashboard...</p>;
   }
 
   if (!user || !userData) {
-    return null;
+    return null; // Redirect handled by useEffect
   }
 
   const displayName = userData.userType === 'athlete' 
@@ -100,138 +106,219 @@ export default function Dashboard() {
     ? userData.profileImageUrl 
     : userData.businessLogoUrl;
 
-
   return (
     <div style={{ 
-        fontFamily: 'Arial, sans-serif',
-        backgroundColor: '#121212',
+        fontFamily: 'Inter, sans-serif', // Using Inter font as per instructions
+        backgroundColor: '#0a0a0a', // Even darker background
         color: '#e0e0e0',
         minHeight: '100vh',
         display: 'flex',
-        justifyContent: 'center',
-        padding: '20px'
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: '0px' // Remove padding from outer div
     }}>
-      <div style={{ 
-          maxWidth: '900px',
-          width: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '20px'
-      }}>
-        
-        {/* User Profile Card */}
-        <div style={{ 
-            backgroundColor: '#1e1e1e', 
-            padding: '25px', 
-            borderRadius: '12px', 
-            boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+        {/* Top Navigation Bar */}
+        <nav style={{
+            width: '100%',
+            backgroundColor: '#1a1a1a',
+            padding: '15px 30px',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.5)',
             display: 'flex',
+            justifyContent: 'space-between',
             alignItems: 'center',
-            gap: '20px'
+            borderRadius: '0 0 8px 8px', // Rounded bottom corners
+            marginBottom: '20px'
         }}>
-          {profileImageUrl && (
-            <img 
-              src={profileImageUrl} 
-              alt="Profile" 
-              style={{ 
-                  width: '80px', 
-                  height: '80px', 
-                  borderRadius: userData.userType === 'athlete' ? '50%' : '8px',
-                  objectFit: userData.userType === 'athlete' ? 'cover' : 'contain',
-                  border: '2px solid #007bff' 
-              }} 
-            />
-          )}
-          <div>
-            <h1 style={{ margin: 0, fontSize: '2em', color: '#007bff' }}>Hello, {displayName}!</h1>
-            <p style={{ margin: 0, color: '#aaa' }}>Welcome to your AthLinq Dashboard.</p>
-          </div>
-        </div>
+            {/* Left side: AthLinq Logo */}
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+                <img 
+                    src="https://raw.githubusercontent.com/Ethanbrock40/athlinq-web/main/public/AthLinq%20no%20BG.jpg" 
+                    alt="AthLinq Logo" 
+                    style={{ 
+                        height: '35px', // Adjusted size for top bar
+                        marginRight: '10px'
+                    }} 
+                />
+            </div>
 
-        {/* Action Buttons Grid */}
+            {/* Right side: User Profile Pic/Initials & Logout */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                {/* Clickable User Profile Pic/Initials */}
+                <div onClick={goToMyProfile} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {profileImageUrl ? (
+                        <img 
+                            src={profileImageUrl} 
+                            alt="User Profile" 
+                            style={{ 
+                                width: '40px', 
+                                height: '40px', 
+                                borderRadius: userData.userType === 'athlete' ? '50%' : '6px',
+                                objectFit: userData.userType === 'athlete' ? 'cover' : 'contain',
+                                border: '1px solid #007bff' 
+                            }} 
+                        />
+                    ) : (
+                        <div style={{ 
+                            width: '40px', 
+                            height: '40px', 
+                            borderRadius: '50%', 
+                            backgroundColor: '#333', 
+                            display: 'flex', 
+                            justifyContent: 'center', 
+                            alignItems: 'center', 
+                            color: '#bbb', 
+                            fontSize: '1.2em' 
+                        }}>
+                            {displayName.charAt(0).toUpperCase()}
+                        </div>
+                    )}
+                    <span style={{ fontSize: '1em', color: '#e0e0e0', fontWeight: 'bold' }}>{displayName}</span>
+                </div>
+                
+                <button 
+                    onClick={handleLogout} 
+                    style={{ 
+                        backgroundColor: '#dc3545', 
+                        color: 'white', 
+                        padding: '8px 15px', 
+                        border: 'none', 
+                        borderRadius: '6px', 
+                        cursor: 'pointer', 
+                        fontSize: '0.9em',
+                        boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
+                        transition: 'background-color 0.2s'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#c82333'}
+                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#dc3545'}
+                >
+                    Logout
+                </button>
+            </div>
+        </nav>
+
+        {/* Main Content Area */}
         <div style={{ 
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '15px'
+            maxWidth: '1200px', // Increased max-width for a wider layout
+            width: '100%',
+            padding: '0 20px', // Padding on sides
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '25px' // Gap between sections
         }}>
-            <ActionButton 
-                text="My Profile" 
-                icon="👤" 
-                onClick={() => router.push(userData.userType === 'athlete' ? '/athlete-profile' : '/business-profile')} 
-                backgroundColor="#007bff"
-            />
-            {userData.userType === 'athlete' && (
-                <ActionButton 
-                    text="Find your next deal" 
+            {/* Welcome Section */}
+            <div style={{ 
+                backgroundColor: '#1e1e1e', 
+                padding: '30px', 
+                borderRadius: '12px', 
+                boxShadow: '0 6px 12px rgba(0,0,0,0.3)',
+                textAlign: 'center'
+            }}>
+                <h2 style={{ margin: '0 0 10px 0', fontSize: '2.5em', color: '#007bff' }}>Welcome, {displayName}!</h2>
+                <p style={{ margin: 0, fontSize: '1.1em', color: '#aaa' }}>Your hub for NIL opportunities.</p>
+            </div>
+
+            {/* Action Cards Grid */}
+            <div style={{ 
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', // Larger min-width for cards
+                gap: '20px' // Gap between cards
+            }}>
+                {/* Removed the 'My Profile' card as the profile picture is now clickable */}
+                
+                <DashboardCard 
+                    title="Find Your Next Deal" 
+                    description="Browse businesses offering NIL partnerships." 
                     icon="💼" 
+                    color="#28a745" 
                     onClick={() => router.push('/find-businesses')} 
-                    backgroundColor="#28a745"
+                    userType={userData.userType} // Pass userType to card for conditional rendering
+                    requiredUserType="athlete" // Specify which userType this card is for
                 />
-            )}
-            {userData.userType === 'business' && (
-                <ActionButton 
-                    text="Find Athletes" 
+                <DashboardCard 
+                    title="Find Athletes" 
+                    description="Discover athletes for your NIL campaigns." 
                     icon="🏃‍♂️" 
+                    color="#28a745" 
                     onClick={() => router.push('/find-athletes')} 
-                    backgroundColor="#28a745"
+                    userType={userData.userType}
+                    requiredUserType="business"
                 />
-            )}
-            <ActionButton 
-                text="Messages (Inbox)" 
-                icon="✉️" 
-                onClick={() => router.push('/inbox')} 
-                backgroundColor="#ffc107"
-            />
-            <ActionButton 
-                text="My Deals" 
-                icon="🤝" 
-                onClick={() => router.push('/my-deals')} 
-                backgroundColor="#6f42c1"
-            />
-            {userData.userType === 'athlete' && stripeConnectStatus !== 'connected' && (
-                <ActionButton 
-                    text={stripeConnectStatus === 'pending_onboarding' ? 'Continue Stripe Setup' : 'Connect Stripe Account'}
-                    icon="💳" 
-                    onClick={handleConnectStripe} 
-                    backgroundColor="#6772E5"
+                <DashboardCard 
+                    title="Messages" 
+                    description="Check your inbox for new conversations." 
+                    icon="✉️" 
+                    color="#ffc107" 
+                    onClick={() => router.push('/inbox')} 
+                    userType={userData.userType}
+                    requiredUserType={['athlete', 'business']} // Both user types can see this
                 />
-            )}
-             <ActionButton 
-                text="Logout" 
-                icon="🚪" 
-                onClick={handleLogout} 
-                backgroundColor="#dc3545"
-            />
+                <DashboardCard 
+                    title="My Deals" 
+                    description="Track all your proposed, accepted, and paid deals." 
+                    icon="🤝" 
+                    color="#6f42c1" 
+                    onClick={() => router.push('/my-deals')} 
+                    userType={userData.userType}
+                    requiredUserType={['athlete', 'business']} // Both user types can see this
+                />
+                {userData.userType === 'athlete' && stripeConnectStatus !== 'connected' && (
+                    <DashboardCard 
+                        title={stripeConnectStatus === 'pending_onboarding' ? 'Continue Stripe Setup' : 'Connect Stripe Account'}
+                        description="Receive payments directly for your NIL deals." 
+                        icon="💳" 
+                        color="#6772E5" 
+                        onClick={handleConnectStripe} 
+                        userType={userData.userType}
+                        requiredUserType="athlete"
+                    />
+                )}
+            </div>
         </div>
-      </div>
     </div>
   );
 }
 
-// --- ActionButton Component (to be placed in the same file for now) ---
-const ActionButton = ({ text, icon, onClick, backgroundColor }) => (
-    <button 
-        onClick={onClick}
-        style={{
-            backgroundColor: backgroundColor,
-            color: 'white',
-            padding: '20px',
-            border: 'none',
-            borderRadius: '12px',
-            fontSize: '1.2em',
-            fontWeight: 'bold',
-            textAlign: 'left',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease-in-out',
-            boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '15px',
-        }}
-        onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
-        onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-    >
-        <span style={{ fontSize: '1.5em' }}>{icon}</span>
-        {text}
-    </button>
-);
+// --- DashboardCard Component ---
+const DashboardCard = ({ title, description, icon, color, onClick, userType, requiredUserType }) => {
+    // Conditionally render the card based on userType
+    const shouldRender = Array.isArray(requiredUserType) 
+        ? requiredUserType.includes(userType)
+        : userType === requiredUserType;
+
+    if (!shouldRender) {
+        return null; // Don't render the card if userType doesn't match
+    }
+
+    return (
+        <div 
+            onClick={onClick}
+            style={{
+                backgroundColor: '#1e1e1e', // Card background
+                padding: '25px',
+                borderRadius: '12px',
+                boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+                cursor: 'pointer',
+                transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                minHeight: '160px', // Ensure consistent card height
+                border: `1px solid ${color}55`, // Subtle border with accent color
+            }}
+            onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-8px)';
+                e.currentTarget.style.boxShadow = `0 8px 16px ${color}44`;
+            }}
+            onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
+            }}
+        >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.4em', color: color }}>{title}</h3>
+                <span style={{ fontSize: '2em', color: color }}>{icon}</span>
+            </div>
+            <p style={{ fontSize: '0.9em', color: '#bbb', lineHeight: '1.4' }}>{description}</p>
+        </div>
+    );
+};
