@@ -9,13 +9,13 @@ const LandingPage = () => {
     <div className={styles['landing-container']}>
       <div className={styles['landing-card']}>
         <img
-          src="/Athlinq no BG.png"
+          src="/AthLinq no BG.png"
           alt="AthLinQ Logo"
           className={styles['logo']}
         />
         <h1 className={styles['heading']}>Your NIL Connection Hub</h1>
         <p className={styles['subheading']}>
-          AthLinQ is the premier platform connecting college athletes with businesses for mutually beneficial NIL partnerships. Find your next opportunity or talent today.
+          AthLinQ is the premier platform designed to streamline NIL partnerships, connecting college athletes and businesses to forge deals that build lasting legacies beyond the classroom.
         </p>
         <div className={styles['button-group']}>
           <button 

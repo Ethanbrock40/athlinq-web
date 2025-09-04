@@ -4,10 +4,12 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { auth, db, app } from '../../lib/firebaseConfig';
-import LoadingLogo from '../../src/components/LoadingLogo'; // NEW: Import LoadingLogo
+import LoadingLogo from '../../src/components/LoadingLogo';
+import ErrorBoundary from '../../src/components/ErrorBoundary';
 
 export default function ProposeDealPage() {
   const [currentUser, setCurrentUser] = useState(null);
+  const [currentUserData, setCurrentUserData] = useState(null);
   const [athleteData, setAthleteData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [dealDetails, setDealDetails] = useState({
@@ -42,6 +44,7 @@ export default function ProposeDealPage() {
         router.push('/dashboard');
         return;
       }
+      setCurrentUserData(currentUserDocSnap.data());
 
       if (athleteUid) {
         const athleteDocRef = doc(db, 'users', athleteUid);
@@ -125,7 +128,7 @@ export default function ProposeDealPage() {
         ...dealDetails,
         proposalFileUrl: proposalUrl,
         proposingBusinessId: currentUser.uid,
-        proposingBusinessName: currentUser.email,
+        proposingBusinessName: currentUserData.companyName,
         athleteId: athleteUid,
         athleteName: athleteData.firstName + ' ' + athleteData.lastName,
         timestamp: serverTimestamp(),
@@ -149,7 +152,7 @@ export default function ProposeDealPage() {
     return <LoadingLogo size="100px" />;
   }
 
-  if (!currentUser || !athleteData) {
+  if (!currentUser || !athleteData || !currentUserData) {
     return (
       <div style={{ padding: '20px', maxWidth: '800px', margin: '50px auto', border: '1px solid #ccc', borderRadius: '8px', backgroundColor: '#f9f9f9', color: '#333' }}>
         <p>Athlete not found or you do not have permission to propose a deal.</p>
@@ -159,103 +162,105 @@ export default function ProposeDealPage() {
   }
 
   return (
-    <div style={{ padding: '20px', maxWidth: '800px', margin: '50px auto', border: '1px solid #ccc', borderRadius: '8px', backgroundColor: '#f9f9f9', color: '#333' }}>
-      <h1 style={{ color: '#007bff', marginBottom: '20px' }}>Propose a Deal to {athleteData.firstName} {athleteData.lastName}</h1>
+    <ErrorBoundary>
+      <div style={{ padding: '20px', maxWidth: '800px', margin: '50px auto', border: '1px solid #ccc', borderRadius: '8px', backgroundColor: '#f9f9f9', color: '#333' }}>
+        <h1 style={{ color: '#007bff', marginBottom: '20px' }}>Propose a Deal to {athleteData.firstName} {athleteData.lastName}</h1>
 
-      <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '15px' }}>
-        <label>
-          Deal Title/Name:
-          <input 
-            type="text" 
-            name="dealTitle" 
-            value={dealDetails.dealTitle} 
-            onChange={handleChange} 
-            required={!isProposalFileSelected}
-            style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }} 
-          />
-        </label>
-        <label>
-          Description of Deliverables:
-          <textarea 
-            name="deliverables" 
-            value={dealDetails.deliverables} 
-            onChange={handleChange} 
-            required={!isProposalFileSelected}
-            style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', height: '80px' }} 
-          />
-        </label>
-        <label>
-          Compensation Type:
-          <select 
-            name="compensationType" 
-            value={dealDetails.compensationType} 
-            onChange={handleChange} 
-            required={!isProposalFileSelected}
-            style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
-          >
-            <option value="">Select Compensation Type</option>
-            <option value="Flat Fee">Flat Fee</option>
-            <option value="Per Post">Per Post</option>
-            <option value="Revenue Share">Revenue Share</option>
-            <option value="Product Gifting">Product Gifting</option>
-          </select>
-        </label>
-        <label>
-          Compensation Amount:
-          <input 
-            type="text" 
-            name="compensationAmount" 
-            value={dealDetails.compensationAmount} 
-            onChange={handleChange} 
-            required={!isProposalFileSelected}
-            style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }} 
-          />
-        </label>
-        <label>
-          Payment Schedule/Terms:
-          <textarea 
-            name="paymentTerms" 
-            value={dealDetails.paymentTerms} 
-            onChange={handleChange} 
-            required={!isProposalFileSelected}
-            style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', height: '80px' }} 
-          />
-        </label>
-        <label>
-          Duration of Deal:
-          <input 
-            type="text" 
-            name="duration" 
-            value={dealDetails.duration} 
-            onChange={handleChange} 
-            required={!isProposalFileSelected}
-            style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }} 
-          />
-        </label>
-        <label>
-          Usage Rights:
-          <textarea name="usageRights" value={dealDetails.usageRights} onChange={handleChange} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', height: '80px' }} />
-        </label>
-        <label>
-          Any Specific Requirements or Clauses:
-          <textarea name="requirements" value={dealDetails.requirements} onChange={handleChange} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', height: '80px' }} />
-        </label>
+        <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '15px' }}>
+          <label>
+            Deal Title/Name:
+            <input 
+              type="text" 
+              name="dealTitle" 
+              value={dealDetails.dealTitle} 
+              onChange={handleChange} 
+              required={!isProposalFileSelected}
+              style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }} 
+            />
+          </label>
+          <label>
+            Description of Deliverables:
+            <textarea 
+              name="deliverables" 
+              value={dealDetails.deliverables} 
+              onChange={handleChange} 
+              required={!isProposalFileSelected}
+              style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', height: '80px' }} 
+            />
+          </label>
+          <label>
+            Compensation Type:
+            <select 
+              name="compensationType" 
+              value={dealDetails.compensationType} 
+              onChange={handleChange} 
+              required={!isProposalFileSelected}
+              style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
+            >
+              <option value="">Select Compensation Type</option>
+              <option value="Flat Fee">Flat Fee</option>
+              <option value="Per Post">Per Post</option>
+              <option value="Revenue Share">Revenue Share</option>
+              <option value="Product Gifting">Product Gifting</option>
+            </select>
+          </label>
+          <label>
+            Compensation Amount:
+            <input 
+              type="text" 
+              name="compensationAmount" 
+              value={dealDetails.compensationAmount} 
+              onChange={handleChange} 
+              required={!isProposalFileSelected}
+              style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }} 
+            />
+          </label>
+          <label>
+            Payment Schedule/Terms:
+            <textarea 
+              name="paymentTerms" 
+              value={dealDetails.paymentTerms} 
+              onChange={handleChange} 
+              required={!isProposalFileSelected}
+              style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', height: '80px' }} 
+            />
+          </label>
+          <label>
+            Duration of Deal:
+            <input 
+              type="text" 
+              name="duration" 
+              value={dealDetails.duration} 
+              onChange={handleChange} 
+              required={!isProposalFileSelected}
+              style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }} 
+            />
+          </label>
+          <label>
+            Usage Rights:
+            <textarea name="usageRights" value={dealDetails.usageRights} onChange={handleChange} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', height: '80px' }} />
+          </label>
+          <label>
+            Any Specific Requirements or Clauses:
+            <textarea name="requirements" value={dealDetails.requirements} onChange={handleChange} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', height: '80px' }} />
+          </label>
 
-        <label htmlFor="proposalFile" style={{ fontWeight: 'bold' }}>
-          Upload Proposal (PDF, Word Doc, etc.):
-        </label>
-        <input type="file" id="proposalFile" name="proposalFile" accept=".pdf,.doc,.docx" onChange={handleChange} />
-        {uploadError && <p style={{ color: 'red' }}>{uploadError}</p>}
-        {uploading && <p>Uploading Proposal... ({Math.round(uploadProgress)}%)</p>}
+          <label htmlFor="proposalFile" style={{ fontWeight: 'bold' }}>
+            Upload Proposal (PDF, Word Doc, etc.):
+          </label>
+          <input type="file" id="proposalFile" name="proposalFile" accept=".pdf,.doc,.docx" onChange={handleChange} />
+          {uploadError && <p style={{ color: 'red' }}>{uploadError}</p>}
+          {uploading && <p>Uploading Proposal... ({Math.round(uploadProgress)}%)</p>}
 
-        <button type="submit" disabled={uploading} style={{ padding: '10px 15px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', opacity: uploading ? 0.7 : 1 }}>
-          {uploading ? 'Proposing Deal...' : 'Propose Deal'}
+          <button type="submit" disabled={uploading} style={{ padding: '10px 15px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', opacity: uploading ? 0.7 : 1 }}>
+            {uploading ? 'Proposing Deal...' : 'Propose Deal'}
+          </button>
+        </form>
+
+        <button onClick={() => router.back()} style={{ marginTop: '20px', padding: '10px 15px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
+          Back to Chat
         </button>
-      </form>
-
-      <button onClick={() => router.back()} style={{ marginTop: '20px', padding: '10px 15px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
-        Back to Chat
-      </button>
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }
