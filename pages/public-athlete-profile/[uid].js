@@ -1,10 +1,10 @@
-// pages/propose-deal/[athleteUid].js
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore'; // Changed setDoc to addDoc
+import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { auth, db, app } from '../../lib/firebaseConfig';
+import LoadingLogo from '../../src/components/LoadingLogo'; // NEW: Import the LoadingLogo component
 
 export default function ProposeDealPage() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -74,8 +74,7 @@ export default function ProposeDealPage() {
     if (!proposalFile) return null;
 
     const storage = getStorage(app);
-    // Path includes auto-generated deal ID to ensure uniqueness for multiple files
-    const storageRef = ref(storage, `proposals/${currentUser.uid}/${athleteUid}/${Date.now()}_${proposalFile.name}`); 
+    const storageRef = ref(storage, `proposals/${currentUser.uid}/${athleteUid}/${Date.now()}_${proposalFile.name}`);
     const uploadTask = uploadBytesResumable(storageRef, proposalFile);
 
     return new Promise((resolve, reject) => {
@@ -122,24 +121,20 @@ export default function ProposeDealPage() {
 
     try {
       const dealsCollectionRef = collection(db, 'deals');
-      // NEW: Generate a unique ID for the deal, not based on chat ID
-      const newDealDocRef = await addDoc(dealsCollectionRef, { // Changed setDoc to addDoc
+      const newDealDocRef = await addDoc(dealsCollectionRef, {
         ...dealDetails,
         proposalFileUrl: proposalUrl,
         proposingBusinessId: currentUser.uid,
-        proposingBusinessName: currentUser.email, // This needs to be the actual business name from its profile
+        proposingBusinessName: currentUser.email,
         athleteId: athleteUid,
         athleteName: athleteData.firstName + ' ' + athleteData.lastName,
         timestamp: serverTimestamp(),
         status: 'proposed',
-        
-        // NEW: Store the chatId to link back to the conversation
-        chatId: [currentUser.uid, athleteUid].sort().join('_'), 
+        chatId: [currentUser.uid, athleteUid].sort().join('_'),
       });
 
       alert('Deal proposal submitted!');
-      // Redirect to the new deal's detail page, using its auto-generated ID
-      router.push(`/deal-details/${newDealDocRef.id}`); // Redirect to new deal's specific page
+      router.push(`/deal-details/${newDealDocRef.id}`);
     } catch (error) {
       console.error('Error proposing deal:', error);
       alert('There was an error submitting the proposal. Please try again.');
@@ -148,11 +143,11 @@ export default function ProposeDealPage() {
     }
   };
 
-  // Determine if a proposal file has been selected
   const isProposalFileSelected = dealDetails.proposalFile !== null;
 
+  // NEW: Render the LoadingLogo component
   if (loading) {
-    return <p>Loading deal proposal page...</p>;
+    return <LoadingLogo size="100px" />;
   }
 
   if (!currentUser || !athleteData) {
@@ -247,7 +242,6 @@ export default function ProposeDealPage() {
           <textarea name="requirements" value={dealDetails.requirements} onChange={handleChange} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', height: '80px' }} />
         </label>
 
-        {/* File Upload Field for Proposal */}
         <label htmlFor="proposalFile" style={{ fontWeight: 'bold' }}>
           Upload Proposal (PDF, Word Doc, etc.):
         </label>

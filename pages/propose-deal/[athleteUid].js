@@ -1,10 +1,10 @@
-// pages/propose-deal/[athleteUid].js
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, collection, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { auth, db, app } from '../../lib/firebaseConfig';
+import LoadingLogo from '../../src/components/LoadingLogo'; // NEW: Import LoadingLogo
 
 export default function ProposeDealPage() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -19,28 +19,27 @@ export default function ProposeDealPage() {
     duration: '',
     usageRights: '',
     requirements: '',
-    proposalFile: null, // State for the selected file
-    proposalFileUrl: '', // State to store the uploaded file URL
+    proposalFile: null,
+    proposalFileUrl: '',
   });
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState(null);
   const router = useRouter();
-  const { athleteUid } = router.query; // Get the athlete's UID from the URL
+  const { athleteUid } = router.query;
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        router.push('/login'); // Redirect to login if not authenticated
+        router.push('/login');
         return;
       }
       setCurrentUser(user);
 
-      // Verify current user is a business trying to propose a deal
       const currentUserDocRef = doc(db, 'users', user.uid);
       const currentUserDocSnap = await getDoc(currentUserDocRef);
       if (!currentUserDocSnap.exists() || currentUserDocSnap.data().userType !== 'business') {
-        router.push('/dashboard'); // Only businesses can access this page
+        router.push('/dashboard');
         return;
       }
 
@@ -75,7 +74,7 @@ export default function ProposeDealPage() {
     if (!proposalFile) return null;
 
     const storage = getStorage(app);
-    const storageRef = ref(storage, `proposals/${currentUser.uid}/${athleteUid}/${proposalFile.name}`);
+    const storageRef = ref(storage, `proposals/${currentUser.uid}/${athleteUid}/${Date.now()}_${proposalFile.name}`);
     const uploadTask = uploadBytesResumable(storageRef, proposalFile);
 
     return new Promise((resolve, reject) => {
@@ -120,27 +119,22 @@ export default function ProposeDealPage() {
       return;
     }
 
-
     try {
       const dealsCollectionRef = collection(db, 'deals');
-      const dealId = [currentUser.uid, athleteUid].sort().join('_');
-      
-      // NEW: Create dataToSave and remove proposalFile before sending to Firestore
-      const dataToSave = { ...dealDetails };
-      delete dataToSave.proposalFile; // <--- THIS IS THE CRITICAL FIX
-
-      await setDoc(doc(db, 'deals', dealId), {
-        ...dataToSave, // Use the cleaned dataToSave object
+      const newDealDocRef = await addDoc(dealsCollectionRef, {
+        ...dealDetails,
         proposalFileUrl: proposalUrl,
         proposingBusinessId: currentUser.uid,
-        proposingBusinessName: currentUser.email, // Or use business name if available
+        proposingBusinessName: currentUser.email,
         athleteId: athleteUid,
         athleteName: athleteData.firstName + ' ' + athleteData.lastName,
         timestamp: serverTimestamp(),
         status: 'proposed',
+        chatId: [currentUser.uid, athleteUid].sort().join('_'),
       });
+
       alert('Deal proposal submitted!');
-      router.push(`/chat/${dealId}`);
+      router.push(`/deal-details/${newDealDocRef.id}`);
     } catch (error) {
       console.error('Error proposing deal:', error);
       alert('There was an error submitting the proposal. Please try again.');
@@ -149,11 +143,10 @@ export default function ProposeDealPage() {
     }
   };
 
-  // Determine if a proposal file has been selected
   const isProposalFileSelected = dealDetails.proposalFile !== null;
 
   if (loading) {
-    return <p>Loading deal proposal page...</p>;
+    return <LoadingLogo size="100px" />;
   }
 
   if (!currentUser || !athleteData) {
@@ -248,7 +241,6 @@ export default function ProposeDealPage() {
           <textarea name="requirements" value={dealDetails.requirements} onChange={handleChange} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', height: '80px' }} />
         </label>
 
-        {/* File Upload Field for Proposal */}
         <label htmlFor="proposalFile" style={{ fontWeight: 'bold' }}>
           Upload Proposal (PDF, Word Doc, etc.):
         </label>

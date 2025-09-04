@@ -1,16 +1,19 @@
-// pages/dashboard.js
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 
 import { auth, db } from '../lib/firebaseConfig';
+import LoadingLogo from '../src/components/LoadingLogo';
+import ErrorBoundary from '../src/components/ErrorBoundary'; 
+import DashboardCard from '../src/components/DashboardCard'; 
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState(null);
-  const [stripeConnectStatus, setStripeConnectStatus] = useState('not_connected'); // 'not_connected', 'pending_onboarding', 'connected'
+  const [stripeConnectStatus, setStripeConnectStatus] = useState('not_connected');
+  const [unreadCount, setUnreadCount] = useState(0);
   const router = useRouter();
 
   useEffect(() => {
@@ -24,12 +27,36 @@ export default function Dashboard() {
           const data = userDocSnap.data();
           setUserData(data);
 
-          // Check for Stripe Connect Account status
           if (data.stripeAccountId) {
-            setStripeConnectStatus('pending_onboarding'); // Assume pending if ID exists but not fully "connected" via API check
+            setStripeConnectStatus('pending_onboarding');
           } else {
             setStripeConnectStatus('not_connected');
           }
+
+          const chatsCollectionRef = collection(db, 'chats');
+          const q1 = query(chatsCollectionRef, where('participant1Id', '==', currentUser.uid));
+          const q2 = query(chatsCollectionRef, where('participant2Id', '==', currentUser.uid));
+          
+          const [snapshot1, snapshot2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+          let unreadChats = 0;
+          
+          const processDocs = (docs) => {
+            docs.forEach(doc => {
+              const chatData = doc.data();
+              const lastMessageTimestamp = chatData.lastMessageTimestamp ? chatData.lastMessageTimestamp.toDate() : new Date(0);
+              const lastReadTimestamp = data.chatsLastRead && data.chatsLastRead[doc.id] 
+                                        ? data.chatsLastRead[doc.id].toDate() 
+                                        : new Date(0);
+              if (lastMessageTimestamp > lastReadTimestamp) {
+                unreadChats++;
+              }
+            });
+          };
+
+          processDocs(snapshot1.docs);
+          processDocs(snapshot2.docs);
+          setUnreadCount(unreadChats);
+
         } else {
           console.log('No user data found for current user.');
         }
@@ -82,18 +109,25 @@ export default function Dashboard() {
     }
   };
 
-  // Function to navigate to user's own profile page
   const goToMyProfile = () => {
     router.push(userData.userType === 'athlete' ? '/athlete-profile' : '/business-profile');
   };
 
+  const handleGetAIMatches = () => {
+    if (user && userData) {
+        router.push(`/ai-matches?userId=${user.uid}&userType=${userData.userType}`);
+    } else {
+        alert('Please log in to get AI matches.');
+    }
+  };
+
 
   if (loading) {
-    return <p style={{ color: 'white', textAlign: 'center', marginTop: '50px', fontFamily: 'Arial, sans-serif' }}>Loading dashboard...</p>;
+    return <LoadingLogo size="120px" />;
   }
 
   if (!user || !userData) {
-    return null; // Redirect handled by useEffect
+    return null;
   }
 
   const displayName = userData.userType === 'athlete' 
@@ -107,235 +141,192 @@ export default function Dashboard() {
     : userData.businessLogoUrl;
 
   return (
-    <div style={{ 
-        fontFamily: 'Inter, sans-serif', // Using Inter font as per instructions
-        backgroundColor: '#0a0a0a', // Even darker background
-        color: '#e0e0e0',
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        padding: '0px' // Remove padding from outer div
-    }}>
-        {/* Top Navigation Bar */}
+    <ErrorBoundary>
+      <div style={{ 
+          fontFamily: 'Inter, sans-serif',
+          backgroundColor: '#0a0a0a',
+          color: '#e0e0e0',
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          padding: '0px'
+      }}>
         <nav style={{
             width: '100%',
             backgroundColor: '#1a1a1a',
-            padding: '10px 30px', // Adjusted padding to accommodate much larger logo
+            padding: '10px 30px',
             boxShadow: '0 2px 10px rgba(0,0,0,0.5)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            borderRadius: '0 0 8px 8px', // Rounded bottom corners
+            borderRadius: '0 0 8px 8px',
             marginBottom: '20px'
         }}>
-            {/* Left side: AthLinq Logo */}
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-                <img 
-                    src="/Athlinq no BG.png" 
-                    alt="AthLinq Logo" 
-                    style={{ 
-                        height: '100px', // Increased height for a much bigger logo
-                        marginRight: '10px'
-                    }} 
-                />
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <img 
+                src="/Athlinq no BG.png" 
+                alt="AthLinq Logo" 
+                style={{ 
+                    height: '70px',
+                    marginRight: '10px'
+                }} 
+            />
+          </div>
 
-            {/* Right side: User Profile Pic/Initials & Logout */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                {/* Clickable User Profile Pic/Initials */}
-                <div onClick={goToMyProfile} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    {profileImageUrl ? (
-                        <img 
-                            src={profileImageUrl} 
-                            alt="User Profile" 
-                            style={{ 
-                                width: '40px', 
-                                height: '40px', 
-                                borderRadius: userData.userType === 'athlete' ? '50%' : '6px',
-                                objectFit: userData.userType === 'athlete' ? 'cover' : 'contain',
-                                border: '1px solid #007bff' 
-                            }} 
-                        />
-                    ) : (
-                        <div style={{ 
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+            <div onClick={goToMyProfile} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {profileImageUrl ? (
+                    <img 
+                        src={profileImageUrl} 
+                        alt="User Profile" 
+                        style={{ 
                             width: '40px', 
                             height: '40px', 
-                            borderRadius: '50%', 
-                            backgroundColor: '#333', 
-                            display: 'flex', 
-                            justifyContent: 'center', 
-                            alignItems: 'center', 
-                            color: '#bbb', 
-                            fontSize: '1.2em' 
-                        }}>
-                            {displayName.charAt(0).toUpperCase()}
-                        </div>
-                    )}
-                    <span style={{ fontSize: '1em', color: '#e0e0e0', fontWeight: 'bold' }}>{displayName}</span>
-                </div>
-                
-                <button 
-                    onClick={handleLogout} 
-                    style={{ 
-                        backgroundColor: '#dc3545', 
-                        color: 'white', 
-                        padding: '8px 15px', 
-                        border: 'none', 
-                        borderRadius: '6px', 
-                        cursor: 'pointer', 
-                        fontSize: '0.9em',
-                        boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
-                        transition: 'background-color 0.2s'
-                    }}
-                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#c82333'}
-                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#dc3545'}
-                >
-                    Logout
-                </button>
+                            borderRadius: userData.userType === 'athlete' ? '50%' : '6px',
+                            objectFit: userData.userType === 'athlete' ? 'cover' : 'contain',
+                            border: '1px solid #007bff' 
+                        }} 
+                    />
+                ) : (
+                    <div style={{ 
+                        width: '40px', 
+                        height: '40px', 
+                        borderRadius: '50%', 
+                        backgroundColor: '#333', 
+                        display: 'flex', 
+                        justifyContent: 'center', 
+                        alignItems: 'center', 
+                        color: '#bbb', 
+                        fontSize: '1.2em' 
+                    }}>
+                        {displayName.charAt(0).toUpperCase()}
+                    </div>
+                )}
+                <span style={{ fontSize: '1em', color: '#e0e0e0', fontWeight: 'bold' }}>{displayName}</span>
             </div>
+            
+            <button 
+                onClick={handleLogout} 
+                style={{ 
+                    backgroundColor: '#dc3545', 
+                    color: 'white', 
+                    padding: '8px 15px', 
+                    border: 'none', 
+                    borderRadius: '6px', 
+                    cursor: 'pointer', 
+                    fontSize: '0.9em',
+                    boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
+                    transition: 'background-color 0.2s'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#c82333'}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#dc3545'}
+            >
+                Logout
+            </button>
+          </div>
         </nav>
 
-        {/* Main Content Area */}
         <div style={{ 
-            maxWidth: '1200px', // Increased max-width for a wider layout
+            maxWidth: '1200px',
             width: '100%',
-            padding: '0 20px', // Padding on sides
+            padding: '0 20px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '25px' // Gap between sections
+            gap: '25px'
         }}>
-            {/* Welcome Section */}
-            <div style={{ 
-                backgroundColor: '#1e1e1e', 
-                padding: '30px', 
-                borderRadius: '12px', 
-                boxShadow: '0 6px 12px rgba(0,0,0,0.3)',
-                textAlign: 'center',
-                display: 'flex', // Use flexbox for alignment
-                alignItems: 'center',
-                justifyContent: 'center', // Center content horizontally
-                gap: '20px' // Space between logo and text
-            }}>
-                {/* NEW: Large App Icon */}
-                <img 
-                    src="/Linq App Icon.png" // Assuming this path for the new icon
-                    alt="App Icon" 
-                    style={{ 
-                        height: '100px', // Adjust size as needed
-                        width: '100px', // Keep aspect ratio
-                        borderRadius: '15px', // Rounded corners for the icon
-                        boxShadow: '0 0 15px rgba(0,123,255,0.5)' // Subtle glow
-                    }} 
-                />
-                <div>
-                    <h2 style={{ margin: '0 0 10px 0', fontSize: '2.5em', color: '#007bff' }}>Welcome, {displayName}!</h2>
-                    <p style={{ margin: 0, fontSize: '1.1em', color: '#aaa' }}>Your hub for NIL opportunities.</p>
-                </div>
+          <div style={{ 
+              backgroundColor: '#1e1e1e', 
+              padding: '30px', 
+              borderRadius: '12px', 
+              boxShadow: '0 6px 12px rgba(0,0,0,0.3)',
+              textAlign: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '20px'
+          }}>
+            <img 
+                src="/Linq App Icon.png"
+                alt="App Icon" 
+                style={{ 
+                    height: '100px',
+                    width: '100px',
+                    borderRadius: '15px',
+                    boxShadow: '0 0 15px rgba(0,123,255,0.5)'
+                }} 
+            />
+            <div>
+                <h2 style={{ margin: '0 0 10px 0', fontSize: '2.5em', color: '#007bff' }}>Welcome, {displayName}!</h2>
+                <p style={{ margin: 0, fontSize: '1.1em', color: '#aaa' }}>Your hub for NIL opportunities.</p>
             </div>
+          </div>
 
-            {/* Action Cards Grid */}
-            <div style={{ 
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', // Larger min-width for cards
-                gap: '20px' // Gap between cards
-            }}>
-                {/* Removed the 'My Profile' card as the profile picture is now clickable */}
-                
+          <div style={{ 
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+              gap: '20px'
+          }}>
+            <DashboardCard 
+                title="Find Your Next Deal" 
+                description="Browse businesses offering NIL partnerships." 
+                icon="💼" 
+                color="#28a745" 
+                onClick={() => router.push('/find-businesses')} 
+                userType={userData.userType}
+                requiredUserType="athlete"
+            />
+            <DashboardCard 
+                title="Find Athletes" 
+                description="Discover athletes for your NIL campaigns." 
+                icon="🏃‍♂️" 
+                color="#28a745" 
+                onClick={() => router.push('/find-athletes')} 
+                userType={userData.userType}
+                requiredUserType="business"
+            />
+            <DashboardCard 
+                title="Messages" 
+                description="Check your inbox for new conversations." 
+                icon="✉️" 
+                count={unreadCount}
+                color="#ffc107" 
+                onClick={() => router.push('/inbox')} 
+                userType={userData.userType}
+                requiredUserType={['athlete', 'business']}
+            />
+            <DashboardCard 
+                title="My Deals" 
+                description="Track all your proposed, accepted, and paid deals." 
+                icon="🤝" 
+                color="#6f42c1" 
+                onClick={() => router.push('/my-deals')} 
+                userType={userData.userType}
+                requiredUserType={['athlete', 'business']}
+            />
+            {userData.userType === 'athlete' && stripeConnectStatus !== 'connected' && (
                 <DashboardCard 
-                    title="Find Your Next Deal" 
-                    description="Browse businesses offering NIL partnerships." 
-                    icon="💼" 
-                    color="#28a745" 
-                    onClick={() => router.push('/find-businesses')} 
-                    userType={userData.userType} // Pass userType to card for conditional rendering
-                    requiredUserType="athlete" // Specify which userType this card is for
-                />
-                <DashboardCard 
-                    title="Find Athletes" 
-                    description="Discover athletes for your NIL campaigns." 
-                    icon="🏃‍♂️" 
-                    color="#28a745" 
-                    onClick={() => router.push('/find-athletes')} 
+                    title={stripeConnectStatus === 'pending_onboarding' ? 'Continue Stripe Setup' : 'Connect Stripe Account'}
+                    description="Receive payments directly for your NIL deals." 
+                    icon="💳" 
+                    color="#6772E5" 
+                    onClick={handleConnectStripe} 
                     userType={userData.userType}
-                    requiredUserType="business"
+                    requiredUserType="athlete"
                 />
-                <DashboardCard 
-                    title="Messages" 
-                    description="Check your inbox for new conversations." 
-                    icon="✉️" 
-                    color="#ffc107" 
-                    onClick={() => router.push('/inbox')} 
-                    userType={userData.userType}
-                    requiredUserType={['athlete', 'business']} // Both user types can see this
-                />
-                <DashboardCard 
-                    title="My Deals" 
-                    description="Track all your proposed, accepted, and paid deals." 
-                    icon="🤝" 
-                    color="#6f42c1" 
-                    onClick={() => router.push('/my-deals')} 
-                    userType={userData.userType}
-                    requiredUserType={['athlete', 'business']} // Both user types can see this
-                />
-                {userData.userType === 'athlete' && stripeConnectStatus !== 'connected' && (
-                    <DashboardCard 
-                        title={stripeConnectStatus === 'pending_onboarding' ? 'Continue Stripe Setup' : 'Connect Stripe Account'}
-                        description="Receive payments directly for your NIL deals." 
-                        icon="💳" 
-                        color="#6772E5" 
-                        onClick={handleConnectStripe} 
-                        userType={userData.userType}
-                        requiredUserType="athlete"
-                    />
-                )}
-            </div>
+            )}
+            <DashboardCard 
+                title="Get AI Matches" 
+                description="Discover intelligent NIL recommendations." 
+                icon="✨" 
+                color="#ff69b4"
+                onClick={handleGetAIMatches} 
+                userType={userData.userType}
+                requiredUserType={['athlete', 'business']}
+            />
+          </div>
         </div>
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }
-
-// --- DashboardCard Component ---
-const DashboardCard = ({ title, description, icon, color, onClick, userType, requiredUserType }) => {
-    // Conditionally render the card based on userType
-    const shouldRender = Array.isArray(requiredUserType) 
-        ? requiredUserType.includes(userType)
-        : userType === requiredUserType;
-
-    if (!shouldRender) {
-        return null; // Don't render the card if userType doesn't match
-    }
-
-    return (
-        <div 
-            onClick={onClick}
-            style={{
-                backgroundColor: '#1e1e1e', // Card background
-                padding: '25px',
-                borderRadius: '12px',
-                boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
-                cursor: 'pointer',
-                transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                minHeight: '160px', // Ensure consistent card height
-                border: `1px solid ${color}55`, // Subtle border with accent color
-            }}
-            onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-8px)';
-                e.currentTarget.style.boxShadow = `0 8px 16px ${color}44`;
-            }}
-            onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
-            }}
-        >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                <h3 style={{ margin: 0, fontSize: '1.4em', color: color }}>{title}</h3>
-                <span style={{ fontSize: '2em', color: color }}>{icon}</span>
-            </div>
-            <p style={{ fontSize: '0.9em', color: '#bbb', lineHeight: '1.4' }}>{description}</p>
-        </div>
-    );
-};

@@ -1,31 +1,41 @@
-// pages/index.js
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { onAuthStateChanged } from 'firebase/auth'; // Import for auth check
-import { auth } from '../lib/firebaseConfig'; // Import auth instance
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../lib/firebaseConfig';
+import LoadingLogo from '../src/components/LoadingLogo';
+import LandingPage from '../src/components/LandingPage'; // NEW: Import LandingPage
 
 export default function Home() {
   const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is already authenticated
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        // If logged in, redirect to dashboard
+        setIsAuthenticated(true);
         router.push('/dashboard');
       } else {
-        // If not logged in, redirect to login page
-        router.push('/login');
+        setIsAuthenticated(false);
+        setLoading(false);
       }
     });
 
-    return () => unsubscribe(); // Clean up the listener
+    return () => unsubscribe();
   }, [router]);
 
-  // Optionally, show a loading message while redirecting
-  return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#000', color: '#fff' }}>
-      <p>Redirecting to AthLinq...</p>
-    </div>
-  );
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#000' }}>
+        <LoadingLogo size="100px" />
+      </div>
+    );
+  }
+
+  // Only render the landing page if the user is not authenticated and loading is complete
+  if (!isAuthenticated && !loading) {
+    return <LandingPage />;
+  }
+
+  return null; // Don't render anything while redirecting or if user is authenticated
 }

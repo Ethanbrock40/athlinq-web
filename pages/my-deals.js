@@ -1,28 +1,27 @@
-// pages/my-deals.js
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../lib/firebaseConfig';
+import LoadingLogo from '../src/components/LoadingLogo'; // NEW: Import LoadingLogo
 
 export default function MyDealsPage() {
   const [currentUser, setCurrentUser] = useState(null);
   const [currentUserData, setCurrentUserData] = useState(null);
-  const [allDeals, setAllDeals] = useState([]); // Stores all fetched deals
+  const [allDeals, setAllDeals] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedStatus, setSelectedStatus] = useState('all'); // New state for filter
+  const [selectedStatus, setSelectedStatus] = useState('all');
 
   const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        router.push('/login'); // Redirect to login if not authenticated
+        router.push('/login');
         return;
       }
       setCurrentUser(user);
 
-      // Fetch current user's profile data
       const currentUserDocRef = doc(db, 'users', user.uid);
       const currentUserDocSnap = await getDoc(currentUserDocRef);
       if (!currentUserDocSnap.exists()) {
@@ -33,7 +32,6 @@ export default function MyDealsPage() {
       const userData = currentUserDocSnap.data();
       setCurrentUserData(userData);
 
-      // Fetch deals where current user is the athlete OR the proposing business
       const dealsCollectionRef = collection(db, 'deals');
 
       const qAthlete = query(dealsCollectionRef, where('athleteId', '==', user.uid));
@@ -44,7 +42,7 @@ export default function MyDealsPage() {
         getDocs(qBusiness)
       ]);
 
-      let allUserDeals = {}; // Use object to merge and de-duplicate
+      let allUserDeals = {};
       snapshotAthlete.docs.forEach(doc => {
         allUserDeals[doc.id] = { id: doc.id, ...doc.data() };
       });
@@ -54,7 +52,6 @@ export default function MyDealsPage() {
 
       const dealsList = await Promise.all(Object.values(allUserDeals).map(async (deal) => {
         let otherPartyName = 'N/A';
-        // The names are already stored on the deal document during proposal, no need to re-fetch
         if (userData.userType === 'athlete') {
           otherPartyName = deal.proposingBusinessName || 'Unknown Business';
         } else if (userData.userType === 'business') {
@@ -64,21 +61,19 @@ export default function MyDealsPage() {
         return { ...deal, otherPartyName };
       }));
 
-      // Sort by latest timestamp (most recent deals first)
       dealsList.sort((a, b) => {
         const timeA = a.timestamp ? a.timestamp.toDate().getTime() : 0;
         const timeB = b.timestamp ? b.timestamp.toDate().getTime() : 0;
         return timeB - timeA;
       });
 
-      setAllDeals(dealsList); // Store all deals
+      setAllDeals(dealsList);
       setLoading(false);
     });
 
     return () => unsubscribe();
   }, [router]);
 
-  // Use useMemo to filter deals based on selectedStatus
   const filteredDeals = useMemo(() => {
     if (selectedStatus === 'all') {
       return allDeals;
@@ -87,7 +82,6 @@ export default function MyDealsPage() {
   }, [allDeals, selectedStatus]);
 
 
-  // Helper to format deal status
   const getStatusStyle = (status) => {
     switch (status) {
       case 'proposed': return { backgroundColor: '#007bff', color: 'white', fontWeight: 'bold', padding: '4px 8px', borderRadius: '4px' };
@@ -100,7 +94,7 @@ export default function MyDealsPage() {
   };
 
   if (loading) {
-    return <p>Loading your deals...</p>;
+    return <LoadingLogo size="100px" />;
   }
 
   if (!currentUser || !currentUserData) {
@@ -108,81 +102,106 @@ export default function MyDealsPage() {
   }
 
   return (
-    <div style={{ padding: '20px', maxWidth: '800px', margin: '50px auto', border: '1px solid #ccc', borderRadius: '8px', backgroundColor: '#f9f9f9', color: '#333' }}>
-      <h1 style={{ color: '#007bff', marginBottom: '20px' }}>My Deals</h1>
+    <div style={{
+        fontFamily: 'Inter, sans-serif',
+        backgroundColor: '#0a0a0a',
+        color: '#e0e0e0',
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: '20px'
+    }}>
+      <div style={{
+          maxWidth: '900px',
+          width: '100%',
+          backgroundColor: '#1e1e1e',
+          padding: '30px',
+          borderRadius: '12px',
+          boxShadow: '0 6px 12px rgba(0,0,0,0.3)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '25px'
+      }}>
+        <h1 style={{ color: '#007bff', textAlign: 'center', marginBottom: '20px' }}>My Deals</h1>
 
-      {/* Status Filter Dropdown */}
-      <div style={{ marginBottom: '20px', paddingBottom: '10px', borderBottom: '1px solid #eee' }}>
-        <label htmlFor="dealStatusFilter" style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Filter by Status:</label>
-        <select
-          id="dealStatusFilter"
-          value={selectedStatus}
-          onChange={(e) => setSelectedStatus(e.target.value)}
-          style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
-        >
-          <option value="all">All Deals</option>
-          <option value="proposed">Proposed</option>
-          <option value="accepted">Accepted</option>
-          <option value="rejected">Rejected</option>
-          <option value="paid">Paid (Finalized)</option>
-          <option value="revoked">Revoked</option>
-        </select>
-      </div>
-
-      {filteredDeals.length === 0 ? (
-        <p>You have no deals matching the selected criteria.</p>
-      ) : (
-        <div style={{ display: 'grid', gap: '15px' }}>
-          {filteredDeals.map(deal => (
-            <div 
-              key={deal.id} 
-              onClick={() => router.push(`/deal-details/${deal.id}`)}
-              style={{ 
-                border: '1px solid #ddd', 
-                padding: '15px', 
-                borderRadius: '8px', 
-                backgroundColor: '#fff', 
-                cursor: 'pointer',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-                transition: 'transform 0.1s ease-in-out',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}
-              onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-              onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-            >
-              <div>
-                <h3 style={{ margin: '0 0 5px 0', color: '#333' }}>{deal.dealTitle || 'Unnamed Deal'}</h3>
-                <p style={{ margin: '0 0 5px 0' }}>
-                  {currentUserData.userType === 'athlete' ? 'From:' : 'To:'} <strong>{deal.otherPartyName}</strong>
-                </p>
-                <p style={{ fontSize: '0.85em', color: '#888', margin: 0 }}>
-                  Proposed: {deal.timestamp ? deal.timestamp.toDate().toLocaleString() : 'N/A'}
-                </p>
-              </div>
-              <div>
-                <span style={getStatusStyle(deal.status)}>{deal.status.charAt(0).toUpperCase() + deal.status.slice(1)}</span>
-              </div>
-            </div>
-          ))}
+        <div style={{ marginBottom: '20px', paddingBottom: '10px', borderBottom: '1px solid #333' }}>
+          <label htmlFor="dealStatusFilter" style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Filter by Status:</label>
+          <select
+            id="dealStatusFilter"
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+            style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #555', backgroundColor: '#333', color: '#e0e0e0' }}
+          >
+            <option value="all">All Deals</option>
+            <option value="proposed">Proposed</option>
+            <option value="accepted">Accepted</option>
+            <option value="rejected">Rejected</option>
+            <option value="paid">Paid (Finalized)</option>
+            <option value="revoked">Revoked</option>
+          </select>
         </div>
-      )}
 
-      <button 
-        onClick={() => router.push('/dashboard')} 
-        style={{ 
-          marginTop: '30px', 
-          padding: '10px 15px', 
-          backgroundColor: '#6c757d', 
-          color: 'white', 
-          border: 'none', 
-          borderRadius: '5px', 
-          cursor: 'pointer' 
-        }}
-      >
-        Back to Dashboard
-      </button>
+        {filteredDeals.length === 0 ? (
+          <p style={{ textAlign: 'center', color: '#aaa' }}>You have no deals matching the selected criteria.</p>
+        ) : (
+          <div style={{ display: 'grid', gap: '15px' }}>
+            {filteredDeals.map(deal => (
+              <div
+                key={deal.id}
+                onClick={() => router.push(`/deal-details/${deal.id}`)}
+                style={{
+                  border: '1px solid #333',
+                  padding: '15px',
+                  borderRadius: '12px',
+                  backgroundColor: '#2a2a2a',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
+                  transition: 'transform 0.1s ease-in-out',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+              >
+                <div>
+                  <h3 style={{ margin: '0 0 5px 0', color: '#e0e0e0' }}>{deal.dealTitle || 'Unnamed Deal'}</h3>
+                  <p style={{ margin: '0 0 5px 0' }}>
+                    {currentUserData.userType === 'athlete' ? 'From:' : 'To:'} <strong style={{ color: '#007bff' }}>{deal.otherPartyName}</strong>
+                  </p>
+                  <p style={{ fontSize: '0.85em', color: '#aaa', margin: 0 }}>
+                    Proposed: {deal.timestamp ? deal.timestamp.toDate().toLocaleString() : 'N/A'}
+                  </p>
+                </div>
+                <div>
+                  <span style={getStatusStyle(deal.status)}>{deal.status.charAt(0).toUpperCase() + deal.status.slice(1)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button
+          onClick={() => router.push('/dashboard')}
+          style={{
+            marginTop: '30px',
+            padding: '10px 15px',
+            backgroundColor: '#6c757d',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontSize: '1em',
+            boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
+            transition: 'background-color 0.2s'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#5a6268'}
+          onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#6c757d'}
+        >
+          Back to Dashboard
+        </button>
+      </div>
     </div>
   );
 }

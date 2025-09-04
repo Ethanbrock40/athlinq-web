@@ -1,9 +1,9 @@
-// pages/signup.js
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '../lib/firebaseConfig';
 import { doc, setDoc } from 'firebase/firestore';
+import LoadingLogo from '../src/components/LoadingLogo'; // NEW: Import LoadingLogo
 
 export default function Signup() {
   const [email, setEmail] = useState('');
@@ -12,12 +12,14 @@ export default function Signup() {
   const [lastName, setLastName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [userType, setUserType] = useState('athlete');
+  const [loading, setLoading] = useState(false); // NEW: State for loading
   const [error, setError] = useState(null);
   const router = useRouter();
 
   const handleSignup = async (e) => {
     e.preventDefault();
     setError(null);
+    setLoading(true); // NEW: Set loading to true
 
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -51,8 +53,14 @@ export default function Signup() {
     } catch (err) {
       console.error('Signup error:', err.message);
       setError(err.message);
+    } finally {
+      setLoading(false); // NEW: Set loading to false
     }
   };
+
+  if (loading) {
+    return <LoadingLogo size="100px" />;
+  }
 
   return (
     <div style={{ padding: '20px', maxWidth: '400px', margin: '50px auto', border: '1px solid #ccc', borderRadius: '8px' }}>
@@ -136,7 +144,7 @@ export default function Signup() {
             <option value="business">Business</option>
           </select>
         </div>
-        <button type="submit" style={{ width: '100%', padding: '10px', backgroundColor: '#0070f3', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
+        <button type="submit" disabled={loading} style={{ width: '100%', padding: '10px', backgroundColor: '#0070f3', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', opacity: loading ? 0.7 : 1 }}>
           Sign Up
         </button>
         {error && <p style={{ color: 'red', marginTop: '10px' }}>{error}</p>}

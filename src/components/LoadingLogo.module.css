@@ -1,0 +1,19 @@
+.loading-logo-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  padding: 50px 0; /* Adjust padding as needed */
+  min-height: 200px; /* Ensure there's enough space for the logo */
+}
+
+.loading-logo-spinner {
+  animation: logo-spin 1.5s ease-in-out infinite; /* Slower, smoother spin */
+  transform-origin: center; /* Ensure it spins around its center */
+}
+
+@keyframes logo-spin {
+  0% { transform: rotateY(0deg); opacity: 0.7; }
+  50% { transform: rotateY(180deg); opacity: 1; } /* Rotates on Y-axis for a flip effect */
+  100% { transform: rotateY(360deg); opacity: 0.7; }
+}
