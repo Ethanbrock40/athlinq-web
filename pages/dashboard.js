@@ -5,8 +5,10 @@ import { doc, getDoc, collection, query, where, getDocs, updateDoc } from 'fireb
 
 import { auth, db } from '../lib/firebaseConfig';
 import LoadingLogo from '../src/components/LoadingLogo';
-import ErrorBoundary from '../src/components/ErrorBoundary'; 
-import DashboardCard from '../src/components/DashboardCard'; 
+import ErrorBoundary from '../src/components/ErrorBoundary';
+import DashboardCard from '../src/components/DashboardCard';
+import Avatar from '../src/components/Avatar';
+import styles from '../src/components/Dashboard.module.css';
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
@@ -142,131 +144,43 @@ export default function Dashboard() {
 
   return (
     <ErrorBoundary>
-      <div style={{ 
-          fontFamily: 'Inter, sans-serif',
-          backgroundColor: '#0a0a0a',
-          color: '#e0e0e0',
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          padding: '0px'
-      }}>
-        <nav style={{
-            width: '100%',
-            backgroundColor: '#1a1a1a',
-            padding: '10px 30px',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.5)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            borderRadius: '0 0 8px 8px',
-            marginBottom: '20px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
+      <div className={styles['dashboard-page-container']}>
+        {/* The new, consolidated top banner */}
+        <nav className={styles['top-banner']}>
+          {/* Left side: AthLinq Logo */}
+          <div className={styles['banner-left-group']}>
             <img 
                 src="/Athlinq no BG.png" 
                 alt="AthLinq Logo" 
-                style={{ 
-                    height: '70px',
-                    marginRight: '10px'
-                }} 
+                className={styles['banner-logo']}
             />
           </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-            <div onClick={goToMyProfile} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                {profileImageUrl ? (
-                    <img 
-                        src={profileImageUrl} 
-                        alt="User Profile" 
-                        style={{ 
-                            width: '40px', 
-                            height: '40px', 
-                            borderRadius: userData.userType === 'athlete' ? '50%' : '6px',
-                            objectFit: userData.userType === 'athlete' ? 'cover' : 'contain',
-                            border: '1px solid #007bff' 
-                        }} 
-                    />
-                ) : (
-                    <div style={{ 
-                        width: '40px', 
-                        height: '40px', 
-                        borderRadius: '50%', 
-                        backgroundColor: '#333', 
-                        display: 'flex', 
-                        justifyContent: 'center', 
-                        alignItems: 'center', 
-                        color: '#bbb', 
-                        fontSize: '1.2em' 
-                    }}>
-                        {displayName.charAt(0).toUpperCase()}
-                    </div>
-                )}
-                <span style={{ fontSize: '1em', color: '#e0e0e0', fontWeight: 'bold' }}>{displayName}</span>
+          {/* Right side: User Profile Pic/Initials & Logout */}
+          <div className={styles['banner-right-group']}>
+            <div onClick={goToMyProfile} className={styles['profile-link-group']}>
+                <Avatar 
+                  url={profileImageUrl}
+                  name={displayName}
+                  size="medium"
+                />
+                <span className={styles['profile-name-text']}>{displayName}</span>
             </div>
             
-            <button 
-                onClick={handleLogout} 
-                style={{ 
-                    backgroundColor: '#dc3545', 
-                    color: 'white', 
-                    padding: '8px 15px', 
-                    border: 'none', 
-                    borderRadius: '6px', 
-                    cursor: 'pointer', 
-                    fontSize: '0.9em',
-                    boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
-                    transition: 'background-color 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#c82333'}
-                onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#dc3545'}
-            >
+            <button onClick={handleLogout} className={styles['logout-button']}>
                 Logout
             </button>
           </div>
         </nav>
 
-        <div style={{ 
-            maxWidth: '1200px',
-            width: '100%',
-            padding: '0 20px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '25px'
-        }}>
-          <div style={{ 
-              backgroundColor: '#1e1e1e', 
-              padding: '30px', 
-              borderRadius: '12px', 
-              boxShadow: '0 6px 12px rgba(0,0,0,0.3)',
-              textAlign: 'center',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '20px'
-          }}>
-            <img 
-                src="/Linq App Icon.png"
-                alt="App Icon" 
-                style={{ 
-                    height: '100px',
-                    width: '100px',
-                    borderRadius: '15px',
-                    boxShadow: '0 0 15px rgba(0,123,255,0.5)'
-                }} 
-            />
-            <div>
-                <h2 style={{ margin: '0 0 10px 0', fontSize: '2.5em', color: '#007bff' }}>Welcome, {displayName}!</h2>
-                <p style={{ margin: 0, fontSize: '1.1em', color: '#aaa' }}>Your hub for NIL opportunities.</p>
-            </div>
+        {/* Main Content Area */}
+        <div className={styles['main-content-area']}>
+          {/* Welcome Banner (now a separate component below the top banner) */}
+          <div className={styles['welcome-banner']}>
+            <h2 className={styles['welcome-heading']}>Welcome, {displayName}!</h2>
+            <p className={styles['welcome-subheading']}>Your hub for NIL opportunities.</p>
           </div>
 
-          <div style={{ 
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-              gap: '20px'
-          }}>
+          <div className={styles['action-cards-grid']}>
             <DashboardCard 
                 title="Find Your Next Deal" 
                 description="Browse businesses offering NIL partnerships." 

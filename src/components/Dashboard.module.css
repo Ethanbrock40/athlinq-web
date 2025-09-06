@@ -1,0 +1,94 @@
+.dashboard-page-container {
+  min-height: 100vh;
+  padding-top: 80px;
+}
+
+.top-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 80px;
+  background-color: var(--background-white);
+  box-shadow: 0 4px 12px var(--shadow-light);
+  padding: 0 20px;
+  z-index: 1000;
+}
+
+.banner-logo {
+  height: 80px;
+}
+
+.welcome-banner {
+  max-width: 1200px;
+  width: 100%;
+  margin: 20px auto;
+  padding: 20px;
+  text-align: center;
+  border-radius: 12px;
+  background-color: var(--accent-blue); /* Updated background color */
+  box-shadow: 0 4px 8px var(--shadow-light);
+}
+
+.welcome-heading {
+  font-size: 2.2em;
+  margin: 0 0 5px 0;
+  color: var(--text-dark);
+}
+
+.welcome-subheading {
+  font-size: 1.1em;
+  margin: 0;
+  color: #888;
+}
+
+.banner-right-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.profile-link-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.profile-link-group:hover {
+  opacity: 0.8;
+}
+
+.profile-name-text {
+  font-size: 0.85em;
+  font-weight: 500;
+  color: var(--text-dark);
+}
+
+.logout-button {
+  background-color: #dc3545;
+  color: var(--text-light);
+  padding: 6px 10px;
+  font-size: 0.8em;
+}
+
+.logout-button:hover {
+  background-color: #c82333;
+}
+
+.main-content-area {
+  max-width: 1200px;
+  width: 100%;
+  padding: 20px;
+  margin: 0 auto;
+}
+
+.action-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}

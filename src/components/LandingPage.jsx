@@ -9,7 +9,7 @@ const LandingPage = () => {
     <div className={styles['landing-container']}>
       <div className={styles['landing-card']}>
         <img
-          src="/AthLinq no BG.png"
+          src="/Athlinq no BG.png"
           alt="AthLinQ Logo"
           className={styles['logo']}
         />
