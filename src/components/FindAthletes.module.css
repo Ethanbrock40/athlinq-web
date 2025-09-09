@@ -1,0 +1,131 @@
+.page-container {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 80px 20px 20px 20px;
+  background-color: var(--background-light-gray);
+  color: var(--text-dark);
+}
+
+.content-card {
+  max-width: 900px;
+  width: 100%;
+  background-color: var(--background-white);
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 6px 12px var(--shadow-light);
+}
+
+.heading {
+  color: var(--primary-blue);
+  text-align: center;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 10px;
+}
+
+.subheading {
+  color: #888;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.filter-controls {
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 20px;
+}
+
+.text-input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-light);
+  background-color: var(--background-white);
+  color: var(--text-dark);
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+
+.dropdown-group {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.select-input {
+  flex: 1;
+  min-width: 150px;
+}
+
+.no-results {
+  text-align: center;
+  color: #888;
+}
+
+.athlete-grid {
+  display: grid;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.athlete-card {
+  border: 1px solid var(--border-light);
+  padding: 15px;
+  border-radius: 12px;
+  background-color: var(--background-light-gray);
+  cursor: pointer;
+  box-shadow: 0 2px 5px var(--shadow-light);
+  transition: transform 0.2s ease-in-out;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.athlete-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 8px var(--shadow-light);
+}
+
+.athlete-name {
+  margin: 0 0 5px 0;
+  color: var(--text-dark);
+  font-size: 1.1em;
+}
+
+.athlete-detail {
+  margin: 0;
+  font-size: 0.9em;
+  color: #888;
+}
+
+.propose-team-button {
+  width: 100%;
+  margin-top: 15px;
+  background-color: var(--primary-blue);
+  color: var(--text-light);
+  font-size: 1em;
+  padding: 12px 15px;
+}
+
+.propose-team-button:hover {
+  background-color: #0056b3;
+}
+
+.back-button {
+  margin-top: 30px;
+  padding: 10px 20px;
+  background-color: var(--primary-blue);
+  color: var(--text-light);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1em;
+  box-shadow: 0 2px 5px var(--shadow-light);
+  transition: background-color 0.2s;
+  align-self: center;
+  width: fit-content;
+}
+
+.back-button:hover {
+  background-color: #0056b3;
+}

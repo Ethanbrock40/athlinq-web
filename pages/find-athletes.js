@@ -2,15 +2,12 @@ import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import Select from 'react-select';
 import { auth, db } from '../lib/firebaseConfig';
 import LoadingLogo from '../src/components/LoadingLogo';
 import Avatar from '../src/components/Avatar';
 import ErrorBoundary from '../src/components/ErrorBoundary';
-
-const SPORTS_OPTIONS = [
-  'Football', 'Basketball', 'Baseball', 'Soccer', 'Track & Field / Cross Country',
-  'Volleyball', 'Softball', 'Swimming & Diving', 'Tennis', 'Golf', 'Other'
-];
+import styles from '../src/components/FindAthletes.module.css';
 
 const NIL_INTERESTS_OPTIONS = [
   'Apparel & Footwear', 'Food & Beverage', 'Technology & Apps', 'Fitness & Wellness',
@@ -24,9 +21,11 @@ export default function FindAthletes() {
   const [loading, setLoading] = useState(true);
   
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSport, setSelectedSport] = useState('');
-  const [selectedUniversity, setSelectedUniversity] = useState('');
+  const [selectedUniversity, setSelectedUniversity] = useState(null);
+  const [selectedSport, setSelectedSport] = useState(null);
   const [selectedNILInterest, setSelectedNILInterest] = useState('');
+  const [schoolsList, setSchoolsList] = useState([]);
+  const [sportsOptions, setSportsOptions] = useState([]);
 
   const router = useRouter();
 
@@ -40,6 +39,15 @@ export default function FindAthletes() {
           router.push('/dashboard');
           return;
         }
+
+        const schoolsCollectionRef = collection(db, 'schools');
+        const schoolsSnapshot = await getDocs(query(schoolsCollectionRef));
+        const schoolsOptions = schoolsSnapshot.docs.map(doc => ({
+            value: doc.id,
+            label: doc.id,
+            sportsTeams: doc.data().sportsTeams
+        }));
+        setSchoolsList(schoolsOptions);
 
         const athletesCollectionRef = collection(db, 'users');
         const q = query(athletesCollectionRef, where('userType', '==', 'athlete'));
@@ -55,6 +63,28 @@ export default function FindAthletes() {
     return () => unsubscribe();
   }, [router]);
 
+  const handleUniversityChange = (selectedOption) => {
+    setSelectedUniversity(selectedOption);
+    const teams = selectedOption ? selectedOption.sportsTeams.map(team => ({ value: team, label: team })) : [];
+    setSportsOptions(teams);
+    setSelectedSport(null);
+  };
+
+  const handleSportChange = (selectedOption) => {
+    setSelectedSport(selectedOption);
+  };
+
+  // NEW: handleProposeTeamDeal function
+  const handleProposeTeamDeal = () => {
+    if (selectedUniversity && selectedSport) {
+        console.log(`Proposing a deal to the ${selectedSport.label} team at ${selectedUniversity.label}`);
+        // TODO: In the next step, we will add the logic to create the group chat
+        alert(`Initiating a team deal for the ${selectedSport.label} team at ${selectedUniversity.label}`);
+    } else {
+        alert("Please select both a university and a sports team.");
+    }
+  };
+  
   const displayedAthletes = useMemo(() => {
     return allAthletes.filter(athlete => {
       const matchesSearch = (athlete.firstName && athlete.firstName.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -62,11 +92,11 @@ export default function FindAthletes() {
                             (athlete.universityCollege && athlete.universityCollege.toLowerCase().includes(searchTerm.toLowerCase()));
 
       const matchesSport = selectedSport
-        ? (athlete.sports && athlete.sports.includes(selectedSport))
+        ? (athlete.sports && athlete.sports.includes(selectedSport.value))
         : true;
       
       const matchesUniversity = selectedUniversity
-        ? (athlete.universityCollege && athlete.universityCollege.toLowerCase().includes(selectedUniversity.toLowerCase()))
+        ? (athlete.universityCollege && athlete.universityCollege === selectedUniversity.value)
         : true;
 
       const matchesNILInterest = selectedNILInterest
@@ -88,91 +118,71 @@ export default function FindAthletes() {
 
   return (
     <ErrorBoundary>
-      <div style={{
-          fontFamily: 'Inter, sans-serif',
-          backgroundColor: '#0a0a0a',
-          color: '#e0e0e0',
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          padding: '20px'
-      }}>
-        <div style={{
-            maxWidth: '900px',
-            width: '100%',
-            backgroundColor: '#1e1e1e',
-            padding: '30px',
-            borderRadius: '12px',
-            boxShadow: '0 6px 12px rgba(0,0,0,0.3)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '25px'
-        }}>
-          <h1 style={{ color: '#007bff', textAlign: 'center', marginBottom: '20px', borderBottom: '1px solid #333', paddingBottom: '10px' }}>Find Athletes</h1>
-          <p style={{ color: '#aaa', textAlign: 'center' }}>Browse athletes looking for NIL partnerships.</p>
+      <div className={styles['page-container']}>
+        <div className={styles['content-card']}>
+          <h1 className={styles['heading']}>Find Athletes</h1>
+          <p className={styles['subheading']}>Browse athletes looking for NIL partnerships.</p>
 
-          <div style={{ marginBottom: '20px', paddingBottom: '20px', borderBottom: '1px solid #333' }}>
+          <div className={styles['filter-controls']}>
             <input
               type="text"
-              placeholder="Search by Name or University..."
+              placeholder="Search by Name..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ width: '100%', padding: '10px', border: '1px solid #555', backgroundColor: '#333', borderRadius: '4px', color: '#e0e0e0', marginBottom: '10px' }}
+              className={styles['text-input']}
             />
-            <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-              <select
-                value={selectedSport}
-                onChange={(e) => setSelectedSport(e.target.value)}
-                style={{ flex: '1', minWidth: '150px', padding: '10px', border: '1px solid #555', backgroundColor: '#333', borderRadius: '4px', color: '#e0e0e0' }}
-              >
-                <option value="">All Sports</option>
-                {SPORTS_OPTIONS.map(option => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
-              <input
-                type="text"
-                placeholder="Filter by University..."
-                value={selectedUniversity}
-                onChange={(e) => setSelectedUniversity(e.target.value)}
-                style={{ flex: '1', minWidth: '150px', padding: '10px', border: '1px solid #555', backgroundColor: '#333', borderRadius: '4px', color: '#e0e0e0' }}
-              />
-              <select
-                value={selectedNILInterest}
-                onChange={(e) => setSelectedNILInterest(e.target.value)}
-                style={{ flex: '1', minWidth: '150px', padding: '10px', border: '1px solid #555', backgroundColor: '#333', borderRadius: '4px', color: '#e0e0e0' }}
-              >
-                <option value="">All NIL Interests</option>
-                {NIL_INTERESTS_OPTIONS.map(option => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
+            <div className={styles['dropdown-group']}>
+                <Select
+                  options={schoolsList}
+                  onChange={handleUniversityChange}
+                  value={selectedUniversity}
+                  isClearable={true}
+                  isSearchable={true}
+                  placeholder="Select University..."
+                  className={styles['select-input']}
+                />
+                {selectedUniversity && (
+                  <Select
+                    options={sportsOptions}
+                    onChange={handleSportChange}
+                    value={selectedSport}
+                    isClearable={true}
+                    isSearchable={true}
+                    placeholder="Select Team..."
+                    className={styles['select-input']}
+                  />
+                )}
+                <select
+                  value={selectedNILInterest}
+                  onChange={(e) => setSelectedNILInterest(e.target.value)}
+                  className={styles['select-input']}
+                >
+                  <option value="">All NIL Interests</option>
+                  {NIL_INTERESTS_OPTIONS.map(option => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
             </div>
+            {/* NEW: Propose Team Deal Button */}
+            {selectedUniversity && selectedSport && (
+              <button 
+                onClick={handleProposeTeamDeal}
+                className={styles['propose-team-button']}
+              >
+                Propose Team Deal
+              </button>
+            )}
           </div>
 
           {displayedAthletes.length === 0 ? (
-            <p style={{ textAlign: 'center', color: '#aaa' }}>No athletes found matching your criteria.</p>
+            <p className={styles['no-results']}>No athletes found matching your criteria.</p>
           ) : (
-            <div style={{ display: 'grid', gap: '20px', marginTop: '20px' }}>
+            <div className={styles['athlete-grid']}>
               {displayedAthletes.map(athlete => (
                 <div
                   key={athlete.id}
                   onClick={() => router.push(`/public-athlete-profile/${athlete.id}`)}
-                  style={{
-                    border: '1px solid #333',
-                    padding: '15px',
-                    borderRadius: '12px',
-                    backgroundColor: '#2a2a2a',
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
-                    transition: 'transform 0.2s ease-in-out',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '15px'
-                  }}
-                  onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-3px)'}
-                  onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                  className={styles['athlete-card']}
                 >
                   <Avatar
                     url={athlete.profileImageUrl}
@@ -180,10 +190,10 @@ export default function FindAthletes() {
                     size="medium"
                   />
                   <div>
-                    <h2 style={{ margin: '0 0 5px 0', color: '#e0e0e0', fontSize: '1.1em' }}>{athlete.firstName} {athlete.lastName}</h2>
-                    <p style={{ margin: '0', fontSize: '0.9em', color: '#aaa' }}><strong>Sport(s):</strong> {athlete.sports && athlete.sports.length > 0 ? athlete.sports.join(', ') : 'N/A'}</p>
-                    <p style={{ margin: '0', fontSize: '0.9em', color: '#aaa' }}><strong>University:</strong> {athlete.universityCollege || 'N/A'}</p>
-                    <p style={{ margin: '0', fontSize: '0.9em', color: '#aaa' }}><strong>NIL Interests:</strong> {athlete.nilInterests && athlete.nilInterests.length > 0 ? athlete.nilInterests.join(', ') : 'N/A'}</p>
+                    <h2 className={styles['athlete-name']}>{athlete.firstName} {athlete.lastName}</h2>
+                    <p className={styles['athlete-detail']}><strong>Sport(s):</strong> {athlete.sports && athlete.sports.length > 0 ? athlete.sports.join(', ') : 'N/A'}</p>
+                    <p className={styles['athlete-detail']}><strong>University:</strong> {athlete.universityCollege || 'N/A'}</p>
+                    <p className={styles['athlete-detail']}><strong>NIL Interests:</strong> {athlete.nilInterests && athlete.nilInterests.length > 0 ? athlete.nilInterests.join(', ') : 'N/A'}</p>
                   </div>
                 </div>
               ))}
@@ -192,22 +202,7 @@ export default function FindAthletes() {
 
           <button
             onClick={() => router.push('/dashboard')}
-            style={{
-              marginTop: '30px',
-              padding: '10px 20px',
-              backgroundColor: '#6c757d',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '1em',
-              boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
-              transition: 'background-color 0.2s',
-              alignSelf: 'center',
-              width: 'fit-content'
-            }}
-            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#5a6268'}
-            onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#6c757d'}
+            className={styles['back-button']}
           >
             Back to Dashboard
           </button>
