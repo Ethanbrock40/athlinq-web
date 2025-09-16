@@ -9,11 +9,14 @@ import {
   addDoc,
   serverTimestamp,
   doc, getDoc, setDoc, updateDoc,
-  where
+  where,
+  writeBatch
 } from 'firebase/firestore';
 import { auth, db } from '../../lib/firebaseConfig';
 import LoadingLogo from '../../src/components/LoadingLogo';
-import ErrorBoundary from '../../src/components/ErrorBoundary'; // NEW: Import ErrorBoundary
+import ErrorBoundary from '../../src/components/ErrorBoundary';
+import Avatar from '../../src/components/Avatar';
+import styles from '../../src/components/Chat.module.css';
 
 export default function ChatPage() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -21,8 +24,8 @@ export default function ChatPage() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const [recipientName, setRecipientName] = useState('Recipient');
-  const [recipientData, setRecipientData] = useState(null);
+  const [chatData, setChatData] = useState(null);
+  const [participantData, setParticipantData] = useState({});
   const [proposedDeal, setProposedDeal] = useState(null);
   const router = useRouter();
   const { chatId } = router.query;
@@ -40,35 +43,41 @@ export default function ChatPage() {
       const currentUserDocRef = doc(db, 'users', user.uid);
       const currentUserDocSnap = await getDoc(currentUserDocRef);
       if (currentUserDocSnap.exists()) {
-          const data = currentUserDocSnap.data();
-          setCurrentUserData(data);
+        const data = currentUserDocSnap.data();
+        setCurrentUserData(data);
       } else {
-          console.log('ChatPage - Current User Data NOT found for UID:', user.uid);
-          setCurrentUserData(null);
+        console.log('ChatPage - Current User Data NOT found for UID:', user.uid);
+        setCurrentUserData(null);
       }
 
       if (chatId) {
-        const participants = chatId.split('_');
-        const recipientUid = participants.find(uid => uid !== user.uid);
-
-        if (recipientUid) {
-          const recipientDocRef = doc(db, 'users', recipientUid);
-          const recipientDocSnap = await getDoc(recipientDocRef);
-          if (recipientDocSnap.exists()) {
-            const data = recipientDocSnap.data();
-            setRecipientData(data);
-            if (data.userType === 'athlete') {
-              setRecipientName(`${data.firstName} ${data.lastName}`);
-            } else if (data.userType === 'business') {
-              setRecipientName(data.companyName);
-            }
-          } else {
-            console.log('ChatPage - Recipient Data NOT found for UID:', recipientUid);
-            setRecipientName('Unknown User (Profile Missing)');
-            setRecipientData(null);
-          }
-        } else {
-            console.log('ChatPage - Recipient UID not found in chatId:', chatId);
+        const chatDocRef = doc(db, 'chats', chatId);
+        const chatDocSnap = await getDoc(chatDocRef);
+        
+        if (chatDocSnap.exists()) {
+            const chatDoc = chatDocSnap.data();
+            setChatData({ id: chatDocSnap.id, ...chatDoc });
+            
+            const participantsArray = chatDoc.participants || [chatDoc.participant1Id, chatDoc.participant2Id];
+            
+            const participantProfiles = {};
+            const participantDocs = await Promise.all(
+                participantsArray.map(pId => getDoc(doc(db, 'users', pId)))
+            );
+            
+            participantDocs.forEach(pDoc => {
+                if (pDoc.exists()) {
+                    const data = pDoc.data();
+                    let name = 'Unknown User';
+                    if (data.userType === 'athlete') {
+                        name = `${data.firstName || ''} ${data.lastName || ''}`.trim();
+                    } else if (data.userType === 'business') {
+                        name = data.companyName || 'Unknown Business';
+                    }
+                    participantProfiles[pDoc.id] = { ...data, name };
+                }
+            });
+            setParticipantData(participantProfiles);
         }
 
         const messagesCollectionRef = collection(db, `chats/${chatId}/messages`);
@@ -100,7 +109,12 @@ export default function ChatPage() {
         const unsubscribeDeal = onSnapshot(dealsQuery, (querySnapshot) => {
             if (!querySnapshot.empty) {
                 const latestDeal = querySnapshot.docs[0].data();
-                setProposedDeal({ id: querySnapshot.docs[0].id, ...latestDeal });
+                // NEW: Only set the deal if its status is still "active"
+                if (latestDeal.status !== 'paid' && latestDeal.status !== 'rejected' && latestDeal.status !== 'revoked') {
+                    setProposedDeal({ id: querySnapshot.docs[0].id, ...latestDeal });
+                } else {
+                    setProposedDeal(null); // Hide completed deals
+                }
             } else {
                 setProposedDeal(null);
             }
@@ -130,207 +144,141 @@ export default function ChatPage() {
 
     const messagesCollectionRef = collection(db, `chats/${chatId}/messages`);
     const chatDocRef = doc(db, 'chats', chatId);
+    const notificationsCollectionRef = collection(db, 'notifications');
+    const batch = writeBatch(db);
 
     try {
-      await addDoc(messagesCollectionRef, {
+      const messageDocRef = doc(messagesCollectionRef);
+      batch.set(messageDocRef, {
         text: newMessage,
         senderId: currentUser.uid,
         senderEmail: currentUser.email,
         timestamp: serverTimestamp(),
       });
 
-      await updateDoc(chatDocRef, {
+      batch.update(chatDocRef, {
         lastMessageText: newMessage,
         lastMessageTimestamp: serverTimestamp(),
       });
 
+      const otherParticipants = chatData.participants ? 
+        chatData.participants.filter(pId => pId !== currentUser.uid) : 
+        [chatData.participant1Id === currentUser.uid ? chatData.participant2Id : chatData.participant1Id];
+      
+      const senderName = currentUserData.userType === 'athlete' ? `${currentUserData.firstName} ${currentUserData.lastName}` : currentUserData.companyName;
+      
+      otherParticipants.forEach(pId => {
+        const notificationDocRef = doc(notificationsCollectionRef);
+        batch.set(notificationDocRef, {
+            recipientId: pId,
+            message: `New message from ${senderName}: ${newMessage}`,
+            link: `/chat/${chatId}`,
+            type: 'new_message',
+            read: false,
+            timestamp: serverTimestamp(),
+        });
+      });
+      
+      await batch.commit();
       setNewMessage('');
+
     } catch (error) {
       console.error("Error sending message:", error);
     }
   };
 
-  if (loading || !currentUserData || !recipientData) {
+  if (loading || !currentUserData || !chatData || Object.keys(participantData).length === 0) {
     return <LoadingLogo size="80px" />;
   }
 
-  const showProposeDealButton = 
-    currentUserData.userType === 'business' &&
-    recipientData.userType === 'athlete';
+  const isGroupChat = chatData.isGroupChat;
+
+  const chatHeader = isGroupChat
+    ? chatData.university ? `Team Chat: ${chatData.university} ${chatData.sportsTeam}` : 'Group Chat'
+    : `Chat with ${participantData[chatData.participants ? chatData.participants.find(pId => pId !== currentUser.uid) : chatData.participant1Id === currentUser.uid ? chatData.participant2Id : chatData.participant1Id]?.name || 'Them'}`;
+
+  const showProposeDealButton = !isGroupChat && currentUserData.userType === 'business' && 
+    (participantData[chatData.participants ? chatData.participants.find(pId => pId !== currentUser.uid) : chatData.participant1Id === currentUser.uid ? chatData.participant2Id : chatData.participant1Id]?.userType === 'athlete');
 
   return (
     <ErrorBoundary>
-      <div style={{ 
-          fontFamily: 'Inter, sans-serif',
-          backgroundColor: '#0a0a0a', 
-          color: '#e0e0e0',
-          minHeight: '100vh',
-          display: 'flex',
-          justifyContent: 'center',
-          padding: '20px'
-      }}>
-        <div style={{ 
-            maxWidth: '900px',
-            width: '100%',
-            backgroundColor: '#1e1e1e', 
-            padding: '20px',
-            borderRadius: '12px', 
-            boxShadow: '0 6px 12px rgba(0,0,0,0.3)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '15px',
-            maxHeight: 'calc(100vh - 40px)',
-            overflow: 'hidden'
-        }}>
-          <h1 style={{ color: '#007bff', textAlign: 'center', marginBottom: '15px', borderBottom: '1px solid #333', paddingBottom: '10px' }}>
-            Chat with {recipientName}
+      <div className={styles['chat-page-container']}>
+        <div className={styles['chat-content-card']}>
+          <h1 className={styles['chat-header']}>
+            {chatHeader}
           </h1>
 
-          {proposedDeal && proposedDeal.status !== 'paid' && proposedDeal.status !== 'revoked' && (
-            <div style={{ 
-                backgroundColor: '#2a2a2a',
-                border: '1px solid #007bff', 
-                padding: '15px', 
-                borderRadius: '8px', 
-                marginBottom: '15px',
-                boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
-            }}>
-              <h2 style={{ color: '#007bff', margin: '0 0 10px 0', fontSize: '1.2em' }}>Proposed Deal</h2>
-              <p style={{ margin: '5px 0' }}><strong>Title:</strong> {proposedDeal.dealTitle || 'N/A'}</p>
-              <p style={{ margin: '5px 0' }}><strong>Compensation:</strong> {proposedDeal.compensationType || 'N/A'} - {proposedDeal.compensationAmount || 'N/A'}</p>
+          {isGroupChat && (
+              <div className={styles['participants-list']}>
+                  <p>Participants: {Object.values(participantData).map(p => p.name).join(', ')}</p>
+              </div>
+          )}
+
+          {proposedDeal && (
+            <div className={styles['deal-card']}>
+              <h2 className={styles['deal-title']}>Proposed Deal</h2>
+              <p><strong>Title:</strong> {proposedDeal.dealTitle || 'N/A'}</p>
+              <p><strong>Compensation:</strong> {proposedDeal.compensationType || 'N/A'} - {proposedDeal.compensationAmount || 'N/A'}</p>
               <button
                 onClick={() => router.push(`/deal-details/${proposedDeal.id}`)}
-                style={{ 
-                    marginTop: '10px', 
-                    padding: '8px 12px', 
-                    backgroundColor: '#007bff', 
-                    color: 'white', 
-                    border: 'none', 
-                    borderRadius: '6px', 
-                    cursor: 'pointer',
-                    transition: 'background-color 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#0056b3'}
-                onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#007bff'}
+                className={styles['deal-button']}
               >
                 View Full Proposal
               </button>
             </div>
           )}
 
-          <div style={{ 
-            flexGrow: 1, 
-            overflowY: 'auto',
-            border: '1px solid #333', 
-            padding: '15px', 
-            borderRadius: '8px', 
-            backgroundColor: '#1a1a1a',
-            marginBottom: '15px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px'
-          }}>
+          <div className={styles['message-area']}>
             {messages.length === 0 ? (
-              <p style={{ textAlign: 'center', color: '#888' }}>Send your first message!</p>
+              <p className={styles['no-messages']}>Send your first message!</p>
             ) : (
-              messages.map(msg => (
-                <div 
-                  key={msg.id} 
-                  style={{ 
-                    display: 'flex',
-                    justifyContent: msg.senderId === currentUser.uid ? 'flex-end' : 'flex-start',
-                  }}
-                >
-                  <div style={{ 
-                    maxWidth: '70%',
-                    padding: '10px 15px', 
-                    borderRadius: '18px',
-                    backgroundColor: msg.senderId === currentUser.uid ? '#007bff' : '#333',
-                    color: 'white',
-                    wordWrap: 'break-word',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-                  }}>
-                    <p style={{ margin: 0, fontSize: '0.95em' }}>{msg.text}</p>
-                    <div style={{ fontSize: '0.75em', color: '#bbb', marginTop: '5px', textAlign: msg.senderId === currentUser.uid ? 'right' : 'left' }}>
-                      {msg.senderId === currentUser.uid ? 'You' : msg.senderEmail || 'Them'} - {msg.timestamp}
+              messages.map(msg => {
+                const senderIsCurrentUser = msg.senderId === currentUser.uid;
+                const senderName = senderIsCurrentUser ? 'You' : participantData[msg.senderId]?.name || 'Them';
+                
+                return (
+                  <div
+                    key={msg.id}
+                    className={`${styles['message-bubble-container']} ${senderIsCurrentUser ? styles['message-sent'] : styles['message-received']}`}
+                  >
+                    <div className={styles['message-bubble']}>
+                      <p className={styles['message-text']}>{msg.text}</p>
+                      <div className={styles['message-info']}>
+                          <span>{senderName} - {msg.timestamp}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
             <div ref={messagesEndRef} />
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <div className={styles['input-area']}>
+            <form onSubmit={handleSendMessage} className={styles['message-form']}>
               <input
                 type="text"
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 placeholder="Type your message..."
-                style={{ flexGrow: 1, padding: '12px', border: '1px solid #555', backgroundColor: '#333', borderRadius: '8px', color: '#e0e0e0', fontSize: '1em' }}
+                className={styles['message-input']}
               />
-              <button 
-                type="submit" 
-                style={{ 
-                    padding: '10px 15px', 
-                    backgroundColor: '#007bff', 
-                    color: 'white', 
-                    border: 'none', 
-                    borderRadius: '8px', 
-                    cursor: 'pointer',
-                    fontSize: '1em',
-                    boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
-                    transition: 'background-color 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#0056b3'}
-                onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#007bff'}
-              >
+              <button type="submit" className={styles['send-button']}>
                 Send
               </button>
             </form>
             
             {showProposeDealButton && (
               <button
-                onClick={() => router.push(`/propose-deal/${recipientData.uid}`)}
-                style={{ 
-                  width: '100%', 
-                  padding: '12px 15px', 
-                  backgroundColor: '#ffaa00', 
-                  color: 'black', 
-                  border: 'none', 
-                  borderRadius: '8px', 
-                  cursor: 'pointer',
-                  fontSize: '1em',
-                  fontWeight: 'bold',
-                  boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
-                  transition: 'background-color 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#e09800'}
-                onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#ffaa00'}
+                onClick={() => router.push(`/propose-deal/${chatData.participant1Id === currentUser.uid ? chatData.participant2Id : chatData.participant1Id}`)}
+                className={styles['propose-deal-button']}
               >
-                Propose New Deal to {recipientName.split(' ')[0]}
+                Propose New Deal to {participantData[chatData.participant1Id === currentUser.uid ? chatData.participant2Id : chatData.participant1Id]?.name.split(' ')[0]}
               </button>
             )}
           </div>
 
-          <button 
-            onClick={() => router.back()}
-            style={{ 
-              marginTop: '15px',
-              padding: '10px 15px', 
-              backgroundColor: '#6c757d', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '8px', 
-              cursor: 'pointer',
-              fontSize: '1em',
-              boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
-              transition: 'background-color 0.2s'
-            }}
-            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#5a6268'}
-            onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#6c757d'}
-          >
+          <button onClick={() => router.back()} className={styles['back-button']}>
             Back
           </button>
         </div>

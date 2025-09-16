@@ -15,7 +15,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState(null);
   const [stripeConnectStatus, setStripeConnectStatus] = useState('not_connected');
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [unreadDealCount, setUnreadDealCount] = useState(0);
   const router = useRouter();
 
   useEffect(() => {
@@ -35,14 +36,21 @@ export default function Dashboard() {
             setStripeConnectStatus('not_connected');
           }
 
+          let chatCount = 0;
+          let dealCount = 0;
+
           const chatsCollectionRef = collection(db, 'chats');
-          const q1 = query(chatsCollectionRef, where('participant1Id', '==', currentUser.uid));
-          const q2 = query(chatsCollectionRef, where('participant2Id', '==', currentUser.uid));
+          const qNew = query(chatsCollectionRef, where('participants', 'array-contains', currentUser.uid));
+          const qOld1 = query(chatsCollectionRef, where('participant1Id', '==', currentUser.uid));
+          const qOld2 = query(chatsCollectionRef, where('participant2Id', '==', currentUser.uid));
+
+          const [snapshotNew, snapshotOld1, snapshotOld2] = await Promise.all([
+            getDocs(qNew),
+            getDocs(qOld1),
+            getDocs(qOld2)
+          ]);
           
-          const [snapshot1, snapshot2] = await Promise.all([getDocs(q1), getDocs(q2)]);
-          let unreadChats = 0;
-          
-          const processDocs = (docs) => {
+          const processChatDocs = (docs) => {
             docs.forEach(doc => {
               const chatData = doc.data();
               const lastMessageTimestamp = chatData.lastMessageTimestamp ? chatData.lastMessageTimestamp.toDate() : new Date(0);
@@ -50,14 +58,23 @@ export default function Dashboard() {
                                         ? data.chatsLastRead[doc.id].toDate() 
                                         : new Date(0);
               if (lastMessageTimestamp > lastReadTimestamp) {
-                unreadChats++;
+                chatCount++;
               }
             });
           };
 
-          processDocs(snapshot1.docs);
-          processDocs(snapshot2.docs);
-          setUnreadCount(unreadChats);
+          processChatDocs(snapshotNew.docs);
+          processChatDocs(snapshotOld1.docs);
+          processChatDocs(snapshotOld2.docs);
+          setUnreadChatCount(chatCount);
+          
+          const notificationsRef = collection(db, 'notifications');
+          const unreadDealNotifQuery = query(notificationsRef, 
+                                        where('recipientId', '==', currentUser.uid), 
+                                        where('read', '==', false),
+                                        where('type', '==', 'deal_update'));
+          const notifSnapshot = await getDocs(unreadDealNotifQuery);
+          setUnreadDealCount(notifSnapshot.docs.length);
 
         } else {
           console.log('No user data found for current user.');
@@ -145,9 +162,7 @@ export default function Dashboard() {
   return (
     <ErrorBoundary>
       <div className={styles['dashboard-page-container']}>
-        {/* The new, consolidated top banner */}
         <nav className={styles['top-banner']}>
-          {/* Left side: AthLinq Logo */}
           <div className={styles['banner-left-group']}>
             <img 
                 src="/Athlinq no BG.png" 
@@ -155,7 +170,6 @@ export default function Dashboard() {
                 className={styles['banner-logo']}
             />
           </div>
-          {/* Right side: User Profile Pic/Initials & Logout */}
           <div className={styles['banner-right-group']}>
             <div onClick={goToMyProfile} className={styles['profile-link-group']}>
                 <Avatar 
@@ -172,9 +186,7 @@ export default function Dashboard() {
           </div>
         </nav>
 
-        {/* Main Content Area */}
         <div className={styles['main-content-area']}>
-          {/* Welcome Banner (now a separate component below the top banner) */}
           <div className={styles['welcome-banner']}>
             <h2 className={styles['welcome-heading']}>Welcome, {displayName}!</h2>
             <p className={styles['welcome-subheading']}>Your hub for NIL opportunities.</p>
@@ -201,9 +213,9 @@ export default function Dashboard() {
             />
             <DashboardCard 
                 title="Messages" 
-                description="Check your inbox for new conversations." 
+                description="View all chats and notifications."
                 icon="✉️" 
-                count={unreadCount}
+                count={unreadChatCount}
                 color="#ffc107" 
                 onClick={() => router.push('/inbox')} 
                 userType={userData.userType}
@@ -213,6 +225,7 @@ export default function Dashboard() {
                 title="My Deals" 
                 description="Track all your proposed, accepted, and paid deals." 
                 icon="🤝" 
+                count={unreadDealCount} // NEW: Pass unreadDealCount
                 color="#6f42c1" 
                 onClick={() => router.push('/my-deals')} 
                 userType={userData.userType}

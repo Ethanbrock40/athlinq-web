@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
-import Select from 'react-select';
+import { collection, where, getDocs, doc, getDoc } from 'firebase/firestore'; 
+import Select from 'react-select'; 
 import { auth, db } from '../lib/firebaseConfig';
 import LoadingLogo from '../src/components/LoadingLogo';
 import Avatar from '../src/components/Avatar';
@@ -20,14 +20,15 @@ export default function FindAthletes() {
   const [allAthletes, setAllAthletes] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedUniversity, setSelectedUniversity] = useState(null);
-  const [selectedSport, setSelectedSport] = useState(null);
-  const [selectedNILInterest, setSelectedNILInterest] = useState('');
+  const router = useRouter();
+  const { query } = router;
+
+  const [searchTerm, setSearchTerm] = useState(query.search || '');
+  const [selectedUniversity, setSelectedUniversity] = useState(query.university ? { value: query.university, label: query.university } : null);
+  const [selectedSport, setSelectedSport] = useState(query.sport ? { value: query.sport, label: query.sport } : null);
+  const [selectedNILInterest, setSelectedNILInterest] = useState(query.nilInterest || '');
   const [schoolsList, setSchoolsList] = useState([]);
   const [sportsOptions, setSportsOptions] = useState([]);
-
-  const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -41,18 +42,24 @@ export default function FindAthletes() {
         }
 
         const schoolsCollectionRef = collection(db, 'schools');
-        const schoolsSnapshot = await getDocs(query(schoolsCollectionRef));
+        const schoolsSnapshot = await getDocs(schoolsCollectionRef);
         const schoolsOptions = schoolsSnapshot.docs.map(doc => ({
             value: doc.id,
             label: doc.id,
             sportsTeams: doc.data().sportsTeams
         }));
         setSchoolsList(schoolsOptions);
+        
+        const universityFromQuery = schoolsOptions.find(school => school.value === query.university);
+        if (universityFromQuery) {
+            const teams = universityFromQuery.sportsTeams.map(team => ({ value: team, label: team }));
+            setSportsOptions(teams);
+        }
 
-        const athletesCollectionRef = collection(db, 'users');
-        const q = query(athletesCollectionRef, where('userType', '==', 'athlete'));
-        const querySnapshot = await getDocs(q);
-        const athletesList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const usersCollectionRef = collection(db, 'users');
+        const usersSnapshot = await getDocs(usersCollectionRef);
+        const allUsers = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const athletesList = allUsers.filter(user => user.userType === 'athlete');
         setAllAthletes(athletesList);
       } else {
         router.push('/login');
@@ -62,6 +69,19 @@ export default function FindAthletes() {
 
     return () => unsubscribe();
   }, [router]);
+
+  useEffect(() => {
+    const newQuery = {
+      ...(searchTerm && { search: searchTerm }),
+      ...(selectedUniversity && { university: selectedUniversity.value }),
+      ...(selectedSport && { sport: selectedSport.value }),
+      ...(selectedNILInterest && { nilInterest: selectedNILInterest }),
+    };
+    router.push({
+      pathname: router.pathname,
+      query: newQuery,
+    }, undefined, { shallow: true });
+  }, [searchTerm, selectedUniversity, selectedSport, selectedNILInterest]);
 
   const handleUniversityChange = (selectedOption) => {
     setSelectedUniversity(selectedOption);
@@ -74,14 +94,33 @@ export default function FindAthletes() {
     setSelectedSport(selectedOption);
   };
 
-  // NEW: handleProposeTeamDeal function
-  const handleProposeTeamDeal = () => {
-    if (selectedUniversity && selectedSport) {
-        console.log(`Proposing a deal to the ${selectedSport.label} team at ${selectedUniversity.label}`);
-        // TODO: In the next step, we will add the logic to create the group chat
-        alert(`Initiating a team deal for the ${selectedSport.label} team at ${selectedUniversity.label}`);
-    } else {
+  const handleProposeTeamDeal = async () => {
+    if (!selectedUniversity || !selectedSport || !user) {
         alert("Please select both a university and a sports team.");
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/propose-team-deal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                businessId: user.uid,
+                universityName: selectedUniversity.value,
+                sportsTeam: selectedSport.value,
+            }),
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            alert(data.message);
+            router.push(`/chat/${data.chatId}`);
+        } else {
+            alert(data.message || 'Failed to create team deal chat.');
+        }
+    } catch (error) {
+        console.error('Error proposing team deal:', error);
+        alert('An unexpected error occurred. Please try again.');
     }
   };
   
@@ -163,7 +202,6 @@ export default function FindAthletes() {
                   ))}
                 </select>
             </div>
-            {/* NEW: Propose Team Deal Button */}
             {selectedUniversity && selectedSport && (
               <button 
                 onClick={handleProposeTeamDeal}
@@ -191,9 +229,15 @@ export default function FindAthletes() {
                   />
                   <div>
                     <h2 className={styles['athlete-name']}>{athlete.firstName} {athlete.lastName}</h2>
-                    <p className={styles['athlete-detail']}><strong>Sport(s):</strong> {athlete.sports && athlete.sports.length > 0 ? athlete.sports.join(', ') : 'N/A'}</p>
-                    <p className={styles['athlete-detail']}><strong>University:</strong> {athlete.universityCollege || 'N/A'}</p>
-                    <p className={styles['athlete-detail']}><strong>NIL Interests:</strong> {athlete.nilInterests && athlete.nilInterests.length > 0 ? athlete.nilInterests.join(', ') : 'N/A'}</p>
+                    <p className={styles['athlete-detail']}>
+                      <strong>Sport(s):</strong> {Array.isArray(athlete.sports) && athlete.sports.length > 0 ? athlete.sports.join(', ') : 'N/A'}
+                    </p>
+                    <p className={styles['athlete-detail']}>
+                      <strong>University:</strong> {athlete.universityCollege || 'N/A'}
+                    </p>
+                    <p className={styles['athlete-detail']}>
+                      <strong>NIL Interests:</strong> {Array.isArray(athlete.nilInterests) && athlete.nilInterests.length > 0 ? athlete.nilInterests.join(', ') : 'N/A'}
+                    </p>
                   </div>
                 </div>
               ))}

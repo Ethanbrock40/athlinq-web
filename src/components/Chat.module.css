@@ -1,0 +1,182 @@
+.chat-page-container {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  background-color: var(--background-light-gray);
+  color: var(--text-dark);
+}
+
+.chat-content-card {
+  max-width: 900px;
+  width: 100%;
+  background-color: var(--background-white);
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 6px 12px var(--shadow-light);
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  max-height: calc(100vh - 40px);
+  overflow: hidden;
+}
+
+.chat-header {
+  color: var(--primary-blue);
+  text-align: center;
+  margin-bottom: 15px;
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 10px;
+}
+
+.participants-list {
+  background-color: var(--background-light-gray);
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 0.9em;
+}
+
+.deal-card {
+  background-color: var(--accent-blue);
+  border: 1px solid var(--primary-blue);
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  box-shadow: 0 2px 5px var(--shadow-light);
+}
+
+.deal-title {
+  color: var(--primary-blue);
+  margin: 0 0 10px 0;
+  font-size: 1.2em;
+}
+
+.deal-button {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background-color: var(--primary-blue);
+  color: var(--text-light);
+  border-radius: 6px;
+}
+
+.deal-button:hover {
+  background-color: #0056b3;
+}
+
+.message-area {
+  flex-grow: 1;
+  overflow-y: auto;
+  border: 1px solid var(--border-light);
+  padding: 15px;
+  border-radius: 8px;
+  background-color: var(--background-light-gray);
+  margin-bottom: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.message-area::-webkit-scrollbar {
+  width: 8px;
+}
+
+.message-area::-webkit-scrollbar-thumb {
+  background-color: #c0c0c0;
+  border-radius: 4px;
+}
+
+.no-messages {
+  text-align: center;
+  color: #888;
+}
+
+.message-bubble-container {
+  display: flex;
+}
+
+.message-sent {
+  justify-content: flex-end;
+}
+
+.message-received {
+  justify-content: flex-start;
+}
+
+.message-bubble {
+  max-width: 70%;
+  padding: 10px 15px;
+  border-radius: 18px;
+  background-color: #007bff; /* Sender's color */
+  color: var(--text-light);
+  word-wrap: break-word;
+  box-shadow: 0 1px 3px var(--shadow-light);
+}
+
+.message-received .message-bubble {
+  background-color: #e0e0e0; /* Recipient's color */
+  color: var(--text-dark);
+}
+
+.message-info {
+  font-size: 0.75em;
+  color: #bbb;
+  margin-top: 5px;
+  text-align: right;
+}
+
+.message-received .message-info {
+  color: #666;
+  text-align: left;
+}
+
+.message-form {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.message-input {
+  flex-grow: 1;
+  padding: 12px;
+  border: 1px solid #ddd;
+  background-color: var(--background-light-gray);
+  color: var(--text-dark);
+  border-radius: 8px;
+}
+
+.send-button {
+  padding: 10px 15px;
+  background-color: var(--primary-blue);
+  color: var(--text-light);
+  border-radius: 8px;
+}
+
+.send-button:hover {
+  background-color: #0056b3;
+}
+
+.propose-deal-button {
+  width: 100%;
+  background-color: #ffaa00;
+  color: var(--text-dark);
+  font-weight: bold;
+  padding: 12px 15px;
+  border-radius: 8px;
+}
+
+.propose-deal-button:hover {
+  background-color: #e09800;
+}
+
+.back-button {
+  margin-top: 15px;
+  padding: 10px 15px;
+  background-color: #6c757d;
+  color: var(--text-light);
+  border-radius: 8px;
+}
+
+.back-button:hover {
+  background-color: #5a6268;
+}

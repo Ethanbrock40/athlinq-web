@@ -5,7 +5,7 @@ import { doc, getDoc, collection, query, where, getDocs, updateDoc, deleteDoc, d
 import { auth, db } from '../lib/firebaseConfig';
 import Avatar from '../src/components/Avatar';
 import LoadingLogo from '../src/components/LoadingLogo';
-import ErrorBoundary from '../src/components/ErrorBoundary'; // NEW: Import ErrorBoundary
+import ErrorBoundary from '../src/components/ErrorBoundary';
 
 const truncateMessage = (text, maxLength) => {
   if (!text) return '';
@@ -38,42 +38,59 @@ export default function InboxPage() {
       setCurrentUserData(userData);
 
       const chatsCollectionRef = collection(db, 'chats');
-      const q1 = query(chatsCollectionRef, where('participant1Id', '==', user.uid));
-      const q2 = query(chatsCollectionRef, where('participant2Id', '==', user.uid));
+      
+      const qNew = query(chatsCollectionRef, where('participants', 'array-contains', user.uid));
+      const qOld1 = query(chatsCollectionRef, where('participant1Id', '==', user.uid));
+      const qOld2 = query(chatsCollectionRef, where('participant2Id', '==', user.uid));
 
-      const [snapshot1, snapshot2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+      const [snapshotNew, snapshotOld1, snapshotOld2] = await Promise.all([
+        getDocs(qNew),
+        getDocs(qOld1),
+        getDocs(qOld2)
+      ]);
 
       let chats = {};
-      snapshot1.docs.forEach(doc => {
-        chats[doc.id] = { id: doc.id, ...doc.data() };
+      snapshotNew.docs.forEach(doc => {
+          chats[doc.id] = { id: doc.id, ...doc.data() };
       });
-      snapshot2.docs.forEach(doc => {
-        chats[doc.id] = { id: doc.id, ...doc.data() };
+      snapshotOld1.docs.forEach(doc => {
+          chats[doc.id] = { id: doc.id, ...doc.data() };
+      });
+      snapshotOld2.docs.forEach(doc => {
+          chats[doc.id] = { id: doc.id, ...doc.data() };
       });
 
       const activeChatsList = Object.values(chats);
 
       const chatsWithDetails = await Promise.all(activeChatsList.map(async (chat) => {
-        const otherParticipantId = chat.participant1Id === user.uid ? chat.participant2Id : chat.participant1Id;
-        const otherParticipantDocRef = doc(db, 'users', otherParticipantId);
-        const otherParticipantDocSnap = await getDoc(otherParticipantDocRef);
-
-        let recipientName = 'Unknown User';
+        let recipientName = '';
         let recipientProfileImageUrl = '';
-        if (otherParticipantDocSnap.exists()) {
-          const otherUserData = otherParticipantDocSnap.data();
-          if (otherUserData.userType === 'athlete') {
-            recipientName = `${otherUserData.firstName} ${otherUserData.lastName}`;
-            recipientProfileImageUrl = otherUserData.profileImageUrl;
-          } else if (otherUserData.userType === 'business') {
-            recipientName = otherUserData.companyName;
-            recipientProfileImageUrl = otherUserData.businessLogoUrl;
+
+        if (chat.isGroupChat) {
+          recipientName = chat.university ? `${chat.university} ${chat.sportsTeam}` : 'Team Chat';
+          recipientProfileImageUrl = '';
+        } else {
+          const otherParticipantId = chat.participant1Id === user.uid ? chat.participant2Id : chat.participant1Id;
+          const otherParticipantDocRef = doc(db, 'users', otherParticipantId);
+          const otherParticipantDocSnap = await getDoc(otherParticipantDocRef);
+          
+          if (otherParticipantDocSnap.exists()) {
+            const otherUserData = otherParticipantDocSnap.data();
+            if (otherUserData.userType === 'athlete') {
+              recipientName = `${otherUserData.firstName} ${otherUserData.lastName}`;
+              recipientProfileImageUrl = otherUserData.profileImageUrl;
+            } else if (otherUserData.userType === 'business') {
+              recipientName = otherUserData.companyName;
+              recipientProfileImageUrl = otherUserData.businessLogoUrl;
+            }
+          } else {
+            recipientName = 'Unknown User';
           }
         }
 
         const lastMessageTimestamp = chat.lastMessageTimestamp ? chat.lastMessageTimestamp.toDate() : new Date(0);
-        const lastReadTimestamp = userData.chatsLastRead && userData.chatsLastRead[chat.id]
-                                ? userData.chatsLastRead[chat.id].toDate()
+        const lastReadTimestamp = userData.chatsLastRead && userData.chatsLastRead[chat.id] 
+                                ? userData.chatsLastRead[chat.id].toDate() 
                                 : new Date(0);
 
         const isUnread = lastMessageTimestamp > lastReadTimestamp;

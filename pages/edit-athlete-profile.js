@@ -21,7 +21,12 @@ export default function EditAthleteProfile() {
         sports: [],
         sportsOther: '',
         bio: '',
-        socialMediaLinks: '',
+        socialMediaLinks: { // NEW: Social media links are now an object
+            instagram: '',
+            x: '',
+            tiktok: '',
+            linkedin: '',
+        },
         achievementsStats: '',
         nilInterests: [],
         nilInterestsOther: '',
@@ -60,7 +65,12 @@ export default function EditAthleteProfile() {
                         sports: data.sports || [],
                         sportsOther: data.sportsOther || '',
                         bio: data.bio || '',
-                        socialMediaLinks: data.socialMediaLinks || '',
+                        socialMediaLinks: { // NEW: Check if object exists, otherwise initialize
+                            instagram: data.socialMediaLinks?.instagram || '',
+                            x: data.socialMediaLinks?.x || '',
+                            tiktok: data.socialMediaLinks?.tiktok || '',
+                            linkedin: data.socialMediaLinks?.linkedin || '',
+                        },
                         achievementsStats: data.achievementsStats || '',
                         nilInterests: data.nilInterests || [],
                         nilInterestsOther: data.nilInterestsOther || '',
@@ -89,10 +99,20 @@ export default function EditAthleteProfile() {
         return () => unsubscribe();
     }, [router]);
 
+    // UPDATED: Handle change for nested social media links
     const handleChange = (e) => {
         const { name, value, type } = e.target;
         if (type === 'file') {
             setProfileData(prevData => ({ ...prevData, [name]: e.target.files && e.target.files.length > 0 ? e.target.files[0] : null }));
+        } else if (name.includes('.')) { // Check for nested fields
+            const [parent, child] = name.split('.');
+            setProfileData(prevData => ({
+                ...prevData,
+                [parent]: {
+                    ...prevData[parent],
+                    [child]: value,
+                },
+            }));
         } else {
             setProfileData(prevData => ({ ...prevData, [name]: value }));
         }
@@ -320,8 +340,13 @@ export default function EditAthleteProfile() {
                             <label htmlFor="achievementsStats" style={{ display: 'block', marginBottom: '5px' }}>Achievements/Stats:</label>
                             <textarea id="achievementsStats" name="achievementsStats" value={profileData.achievementsStats} onChange={handleChange} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #555', backgroundColor: '#333', color: '#e0e0e0', minHeight: '100px', width: '100%', marginBottom: '10px' }} />
                             
-                            <label htmlFor="socialMediaLinks" style={{ display: 'block', marginBottom: '5px' }}>Social Media Links (comma-separated if multiple):</label>
-                            <input type="text" id="socialMediaLinks" name="socialMediaLinks" value={profileData.socialMediaLinks} onChange={handleChange} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #555', backgroundColor: '#333', color: '#e0e0e0', width: '100%' }} placeholder="e.g., instagram.com/..., twitter.com/..." />
+                            <label htmlFor="socialMediaLinks" style={{ display: 'block', marginBottom: '5px' }}>Social Media Links:</label>
+                            <div style={{ display: 'grid', gap: '10px' }}>
+                                <input type="text" name="socialMediaLinks.instagram" value={profileData.socialMediaLinks.instagram} onChange={handleChange} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #555', backgroundColor: '#333', color: '#e0e0e0', width: '100%' }} placeholder="Instagram" />
+                                <input type="text" name="socialMediaLinks.x" value={profileData.socialMediaLinks.x} onChange={handleChange} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #555', backgroundColor: '#333', color: '#e0e0e0', width: '100%' }} placeholder="X (Twitter)" />
+                                <input type="text" name="socialMediaLinks.tiktok" value={profileData.socialMediaLinks.tiktok} onChange={handleChange} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #555', backgroundColor: '#333', color: '#e0e0e0', width: '100%' }} placeholder="TikTok" />
+                                <input type="text" name="socialMediaLinks.linkedin" value={profileData.socialMediaLinks.linkedin} onChange={handleChange} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #555', backgroundColor: '#333', color: '#e0e0e0', width: '100%' }} placeholder="LinkedIn" />
+                            </div>
                         </div>
 
                         <div style={{ backgroundColor: '#2a2a2a', padding: '20px', borderRadius: '10px', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }}>
@@ -356,6 +381,7 @@ export default function EditAthleteProfile() {
 
 const NIL_INTERESTS_OPTIONS = [
     'Apparel & Footwear', 'Food & Beverage', 'Technology & Apps', 'Fitness & Wellness',
-    'Automotive', 'Gaming', 'Financial Services', 'Retail', 'Hospitality & Travel',
-    'Media & Entertainment', 'Other'
+    'Automotive', 'Gaming',
+    'Financial Services', 'Retail',
+    'Hospitality & Travel', 'Media & Entertainment', 'Other'
 ];
